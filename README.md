@@ -2,6 +2,8 @@
 
 Review a diff beside your coding agent, and send comments on its lines straight into the agent's prompt.
 
+![rexdiff in a Rex pane beside a Claude Code session](assets/screenshot.png)
+
 rexdiff is a terminal diff viewer for [Rex](https://www.superlogical.com/rex). It opens in a pane next to your agent session, such as Claude Code. Select lines, write a question or a remark, and press Enter. rexdiff pastes the file, the line numbers, the selected lines, and your comment into the agent's prompt, so you can keep the conversation in the session you already have.
 
 It shows two kinds of diff:
