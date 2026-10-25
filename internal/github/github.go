@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os/exec"
 	"strings"
 	"time"
@@ -73,6 +74,21 @@ func Fetch(target string) (PullRequest, string, error) {
 func OpenInBrowser(url string) error {
 	_, err := run("pr", "view", url, "--web")
 	return err
+}
+
+// Repository reads "owner/repo" from a pull request URL, such as
+// https://github.com/owner/repo/pull/12.
+func Repository(pullRequestURL string) string {
+	parsed, err := url.Parse(pullRequestURL)
+	if err != nil {
+		return ""
+	}
+
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[0] + "/" + parts[1]
 }
 
 // withTarget adds the target to gh arguments when there is one.

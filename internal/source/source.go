@@ -4,8 +4,6 @@ package source
 
 import (
 	"fmt"
-	"net/url"
-	"strings"
 
 	"github.com/segersniels/rexdiff/internal/github"
 )
@@ -46,26 +44,11 @@ func (p PullRequest) Load() (Review, error) {
 		return Review{}, err
 	}
 	return Review{
-		Context:     fmt.Sprintf("%s #%d", repository(pr.URL), pr.Number),
+		Context:     fmt.Sprintf("%s #%d", github.Repository(pr.URL), pr.Number),
 		Title:       pr.Title,
 		Base:        pr.BaseRefName,
 		Head:        pr.HeadRefName,
 		Diff:        diff,
 		PullRequest: &pr,
 	}, nil
-}
-
-// repository reads "owner/repo" from a pull request URL, such as
-// https://github.com/owner/repo/pull/12.
-func repository(pullRequestURL string) string {
-	parsed, err := url.Parse(pullRequestURL)
-	if err != nil {
-		return ""
-	}
-
-	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-	if len(parts) < 2 {
-		return ""
-	}
-	return parts[0] + "/" + parts[1]
 }

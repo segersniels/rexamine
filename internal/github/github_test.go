@@ -1,4 +1,4 @@
-package source
+package github
 
 import "testing"
 
@@ -10,8 +10,8 @@ func TestRepository(t *testing.T) {
 	}
 
 	for url, want := range tests {
-		if got := repository(url); got != want {
-			t.Errorf("repository(%q) = %q, want %q", url, got, want)
+		if got := Repository(url); got != want {
+			t.Errorf("Repository(%q) = %q, want %q", url, got, want)
 		}
 	}
 }
