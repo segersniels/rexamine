@@ -80,9 +80,14 @@ type Model struct {
 	spinner     spinner.Model
 	composer    textarea.Model
 
-	review   *source.Review
-	files    []diff.File
-	loadErr  error
+	review  *source.Review
+	files   []diff.File
+	loadErr error
+
+	// highlights holds the syntax colors of files. They are computed once per
+	// load, because a new layout on each resize must stay fast.
+	highlights []highlightedFile
+
 	loading  bool
 	loadGen  int
 	watchGen int
@@ -271,7 +276,9 @@ func (m Model) handleLoaded(msg loadedMsg) (tea.Model, tea.Cmd) {
 
 	m.loadErr = nil
 	m.review = &msg.review
-	m.layout(diff.Parse(msg.review.Diff))
+	files := diff.Parse(msg.review.Diff)
+	m.highlights = highlightFiles(files, m.markdownStyle)
+	m.layout(files)
 	return m, watch
 }
 
@@ -452,7 +459,7 @@ func (m *Model) layout(files []diff.File) {
 	}
 
 	m.files = files
-	m.rows, m.fileStarts = layoutPage(*m.review, files, m.contentWidth(), m.markdownStyle, m.collapsed)
+	m.rows, m.fileStarts = layoutPage(*m.review, files, m.highlights, m.contentWidth(), m.markdownStyle, m.collapsed)
 
 	m.cursor = int(progress * float64(len(m.rows)))
 	if i, ok := m.findLine(cursorKey); cursorOnLine && ok {

@@ -27,7 +27,7 @@ const (
 type row struct {
 	kind rowKind
 
-	// text is rendered for prose and file rows, and plain for code rows.
+	// text is rendered. Code rows hold only the syntax colors of the line.
 	text string
 
 	// The fields below are set for file and code rows. file is -1 elsewhere.
@@ -45,9 +45,10 @@ func (r row) sameLine(other row) bool {
 }
 
 // layoutPage lays out the review as rows that are at most width wide.
-// fileStarts holds the index of each file's first row. collapsed holds the
-// paths of the files that show only their title.
-func layoutPage(review source.Review, files []diff.File, width int, markdownStyle string, collapsed map[string]bool) (rows []row, fileStarts []int) {
+// fileStarts holds the index of each file's first row. highlights holds the
+// syntax colors of files. collapsed holds the paths of the files that show
+// only their title.
+func layoutPage(review source.Review, files []diff.File, highlights []highlightedFile, width int, markdownStyle string, collapsed map[string]bool) (rows []row, fileStarts []int) {
 	addProse := func(text string) {
 		for _, line := range strings.Split(text, "\n") {
 			rows = append(rows, row{kind: proseRow, text: line, file: -1})
@@ -75,14 +76,14 @@ func layoutPage(review source.Review, files []diff.File, width int, markdownStyl
 	for i, file := range files {
 		addProse("")
 		fileStarts = append(fileStarts, len(rows))
-		rows = append(rows, layoutFile(i, file, width, collapsed[file.Path])...)
+		rows = append(rows, layoutFile(i, file, highlights[i], width, collapsed[file.Path])...)
 	}
 	return rows, fileStarts
 }
 
 // layoutFile lays out one file's title, hunk headers, and lines. A collapsed
-// file shows only its title.
-func layoutFile(index int, file diff.File, width int, collapsed bool) []row {
+// file shows only its title. highlighted holds the syntax colors of the lines.
+func layoutFile(index int, file diff.File, highlighted highlightedFile, width int, collapsed bool) []row {
 	var rows []row
 	for _, line := range strings.Split(ansi.Wrap(fileTitle(file, collapsed), width, "/"), "\n") {
 		rows = append(rows, row{kind: fileRow, text: line, file: index, hunk: -1})
@@ -109,20 +110,24 @@ func layoutFile(index int, file diff.File, width int, collapsed bool) []row {
 				number = line.OldLine
 			}
 
-			text := strings.ReplaceAll(line.Text, "\t", "    ")
+			text := expandTabs(line.Text)
 
 			// Most lines fit, and a string is never wider than its length in bytes.
 			chunks := []string{text}
 			if len(text) > textWidth {
 				chunks = strings.Split(ansi.Hardwrap(text, textWidth, true), "\n")
 			}
+			offset := 0
 			for part, chunk := range chunks {
+				colored := colorize(spansIn(highlighted[h][l], offset, offset+len(chunk)))
+				offset += len(chunk)
+
 				gutter := strings.Repeat(" ", gutterWidth)
 				if part == 0 {
 					gutter = fmt.Sprintf("%*d %s ", numberWidth, number, line.Kind.Sign())
 				}
 				rows = append(rows, row{
-					kind: codeRow, text: chunk, file: index, hunk: h, line: l,
+					kind: codeRow, text: colored, file: index, hunk: h, line: l,
 					gutter: gutter, change: line.Kind,
 				})
 			}
