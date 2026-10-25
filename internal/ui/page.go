@@ -110,7 +110,13 @@ func layoutFile(index int, file diff.File, width int, collapsed bool) []row {
 			}
 
 			text := strings.ReplaceAll(line.Text, "\t", "    ")
-			for part, chunk := range strings.Split(ansi.Hardwrap(text, textWidth, true), "\n") {
+
+			// Most lines fit, and a string is never wider than its length in bytes.
+			chunks := []string{text}
+			if len(text) > textWidth {
+				chunks = strings.Split(ansi.Hardwrap(text, textWidth, true), "\n")
+			}
+			for part, chunk := range chunks {
 				gutter := strings.Repeat(" ", gutterWidth)
 				if part == 0 {
 					gutter = fmt.Sprintf("%*d %s ", numberWidth, number, line.Kind.Sign())
