@@ -88,8 +88,23 @@ type RexPane struct {
 	Block   string
 }
 
-// Send pastes the text into the pane through the rex CLI.
+// Send pastes the text into the pane through the rex CLI. When rex fails, it
+// copies the text to the clipboard, so the comment is not lost.
 func (p RexPane) Send(text string) error {
+	err := p.paste(text)
+	if err == nil {
+		return nil
+	}
+
+	// Rex is in beta, so an update can change the API that the paste uses.
+	if clipErr := clipboard.WriteAll(text); clipErr != nil {
+		return err
+	}
+	return fmt.Errorf("%w; copied the comment to the clipboard instead", err)
+}
+
+// paste sends the text to the pane as a paste event.
+func (p RexPane) paste(text string) error {
 	request, err := json.Marshal(map[string]any{
 		"block_id": p.Block,
 		"event":    map[string]any{"type": "paste", "payload": map[string]string{"text": text}},
@@ -107,7 +122,13 @@ func (p RexPane) Send(text string) error {
 	cmd := exec.Command("rex", args...)
 	cmd.Stdin = bytes.NewReader(request)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("rex: %s", strings.TrimSpace(string(out)))
+		message := strings.TrimSpace(string(out))
+
+		// rex prints nothing when it cannot start, for example when it is not installed.
+		if message == "" {
+			message = err.Error()
+		}
+		return fmt.Errorf("rex: %s", message)
 	}
 	return nil
 }

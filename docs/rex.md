@@ -43,3 +43,29 @@ Comments work with every agent without the skill, because rexdiff pastes them in
 | Crush          | `~/.config/crush/skills`                          |
 
 When you install another agent later, run `rexdiff setup` again. See [Installation and setup](install.md).
+
+## When Rex changes
+
+> [!IMPORTANT]
+> Rex is in beta, and an update can change the parts of Rex that rexdiff uses. rexdiff keeps working as a diff viewer in that case, but the pane or the comments can stop working until rexdiff is updated.
+
+rexdiff uses these parts of Rex:
+
+| Part                      | Used for                                                        |
+| ------------------------- | --------------------------------------------------------------- |
+| `rex api call block.event` | Paste a comment into the agent's pane.                         |
+| The Lua configuration API | The `rexdiff` action and its key: `rex.action`, `rex.bind`, `rex.session.new_split`, `rex.session.view`, `rex.block.call`, and `rex.call`. |
+| `rex do rexdiff`          | Open the pane from the agent skill.                             |
+| `rex config reload`       | Load the module after `rexdiff setup`.                          |
+
+If something stops working after a Rex update:
+
+1. **Comments do not reach the agent.** rexdiff copies a comment to the clipboard when the paste fails, and shows the error at the bottom of the pane. Paste the comment into the agent yourself.
+2. **The key or the action does nothing.** Update rexdiff and run `rexdiff setup` again. Then run `rex config reload` and read the errors that it reports.
+3. **The agent cannot open the pane.** The agent skill tells the agent to read `rex skill show`, which describes the commands of the installed Rex version, and to open the pane with them. You can do the same by hand:
+
+   ```sh
+   rex split --split=right -- rexdiff --agent "$REX_BLOCK"
+   ```
+
+4. **Report it.** Open an [issue](https://github.com/segersniels/rexdiff/issues/new/choose) with the output of `rex version`, the error, and the output of `rex api describe block.event` if the comments fail.
