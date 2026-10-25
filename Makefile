@@ -15,6 +15,8 @@ build:
 ## install: Install the binary to ~/.local/bin.
 install: build
 	mkdir -p $(INSTALL_PATH)
+	# macOS kills a binary that is overwritten in place, so replace the file instead.
+	rm -f $(INSTALL_PATH)/$(BINARY_NAME)
 	cp $(BUILD_DIR)/$(BINARY_NAME) $(INSTALL_PATH)/$(BINARY_NAME)
 
 ## setup: Install the binary, then the Rex module and the agent skill.
