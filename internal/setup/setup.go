@@ -35,6 +35,10 @@ type Options struct {
 // rexRequire is the text that marks an init.lua that already loads rexdiff.
 const rexRequire = `require("rexdiff")`
 
+// rexMarker starts the lines that setup adds to init.lua, so that uninstall
+// can find them.
+const rexMarker = "-- Added by `rexdiff setup`."
+
 // Run installs the selected parts and reports each step to opts.Out. Running
 // it again updates the files and leaves an existing init.lua line alone.
 func Run(files Files, opts Options) error {
@@ -100,7 +104,7 @@ func installRex(module []byte, opts Options) error {
 // the module, for example after a Rex update, and log it instead.
 func setupCall(opts Options) string {
 	var call strings.Builder
-	call.WriteString("-- Added by `rexdiff setup`. An error in rexdiff does not stop the rest of this file.\n")
+	call.WriteString(rexMarker + " An error in rexdiff does not stop the rest of this file.\n")
 	call.WriteString("do\n")
 	call.WriteString("  local ok, err = pcall(function()\n")
 	call.WriteString("    " + rexRequire + ".setup{\n")
@@ -164,6 +168,114 @@ func installSkill(skill []byte, out io.Writer) error {
 	return nil
 }
 
+// Uninstall removes the Rex module, the lines that setup added to init.lua,
+// and the agent skill of every known agent, and reports each step to out.
+func Uninstall(out io.Writer) error {
+	if err := uninstallRex(out); err != nil {
+		return fmt.Errorf("remove the Rex module: %w", err)
+	}
+
+	if err := uninstallSkill(out); err != nil {
+		return fmt.Errorf("remove the agent skill: %w", err)
+	}
+	return nil
+}
+
+// uninstallRex removes the Rex module and the setup lines in init.lua, and
+// reloads the Rex configuration when it changed something.
+func uninstallRex(out io.Writer) error {
+	initPath, err := rexInitPath()
+	if err != nil {
+		return err
+	}
+
+	changed := false
+	modulePath := filepath.Join(filepath.Dir(initPath), "rexdiff.lua")
+	err = os.Remove(modulePath)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	if err == nil {
+		report(out, "Rex module", "removed "+modulePath)
+		changed = true
+	}
+
+	current, err := os.ReadFile(initPath)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+
+	updated, removed := removeSetupCall(string(current))
+	if removed {
+		if err := os.WriteFile(initPath, []byte(updated), 0o644); err != nil {
+			return err
+		}
+		report(out, "Rex config", "removed rexdiff from "+initPath)
+		changed = true
+	}
+
+	// Lines that the user wrote can hold other options, so only the user can remove them.
+	if strings.Contains(updated, rexRequire) {
+		_, _ = fmt.Fprintf(out, "  %s still loads rexdiff. Remove those lines yourself.\n", initPath)
+	}
+
+	if changed {
+		reloadRex(out)
+	}
+	return nil
+}
+
+// removeSetupCall removes the lines that setup added to init.lua, and the
+// blank line that setup put above them. The lines end at the first line that
+// is "end", or "}" in the older format without pcall.
+func removeSetupCall(text string) (string, bool) {
+	start := strings.Index(text, rexMarker)
+	if start < 0 {
+		return text, false
+	}
+
+	lines := strings.SplitAfter(text[start:], "\n")
+	end := start
+	for _, line := range lines {
+		end += len(line)
+		if trimmed := strings.TrimRight(line, "\r\n"); trimmed == "end" || trimmed == "}" {
+			return strings.TrimSuffix(text[:start], "\n") + text[end:], true
+		}
+	}
+	return text, false
+}
+
+// uninstallSkill removes the agent skill from the skills directory of every
+// known agent, also of agents that are no longer installed.
+func uninstallSkill(out io.Writer) error {
+	agents, err := knownAgents()
+	if err != nil {
+		return err
+	}
+
+	seen := map[string]bool{}
+	for _, a := range agents {
+		if seen[a.skillsDir] {
+			continue
+		}
+		seen[a.skillsDir] = true
+
+		dir := filepath.Join(a.skillsDir, "rexdiff")
+		err := os.Remove(filepath.Join(dir, "SKILL.md"))
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+
+		// The directory stays when it holds files that the user added.
+		_ = os.Remove(dir)
+		report(out, "Agent skill", "removed "+dir)
+	}
+	return nil
+}
+
 // agent is a coding agent that loads skills from a directory.
 type agent struct {
 	name string
@@ -174,8 +286,24 @@ type agent struct {
 }
 
 // installedAgents lists the agents whose configuration directory exists.
-// The directories follow the skills CLI, github.com/vercel-labs/skills.
 func installedAgents() ([]agent, error) {
+	known, err := knownAgents()
+	if err != nil {
+		return nil, err
+	}
+
+	var installed []agent
+	for _, a := range known {
+		if info, err := os.Stat(a.configDir); err == nil && info.IsDir() {
+			installed = append(installed, a)
+		}
+	}
+	return installed, nil
+}
+
+// knownAgents lists the agents that rexdiff can install the skill for. The
+// directories follow the skills CLI, github.com/vercel-labs/skills.
+func knownAgents() ([]agent, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -188,7 +316,7 @@ func installedAgents() ([]agent, error) {
 	// Several agents read the shared Agent Skills directory.
 	shared := filepath.Join(home, ".agents", "skills")
 
-	known := []agent{
+	return []agent{
 		{"Claude Code", claude, filepath.Join(claude, "skills")},
 		{"Codex", codex, shared},
 		{"OpenCode", filepath.Join(config, "opencode"), filepath.Join(config, "opencode", "skills")},
@@ -200,15 +328,7 @@ func installedAgents() ([]agent, error) {
 		{"Droid", filepath.Join(home, ".factory"), filepath.Join(home, ".factory", "skills")},
 		{"Goose", filepath.Join(config, "goose"), filepath.Join(config, "goose", "skills")},
 		{"Crush", filepath.Join(config, "crush"), filepath.Join(config, "crush", "skills")},
-	}
-
-	var installed []agent
-	for _, a := range known {
-		if info, err := os.Stat(a.configDir); err == nil && info.IsDir() {
-			installed = append(installed, a)
-		}
-	}
-	return installed, nil
+	}, nil
 }
 
 // envOr returns the environment variable, or fallback when it is empty.

@@ -39,12 +39,14 @@ var (
 const usage = `Usage: rexdiff [flags] [<pr-number> | <pr-url>]
        rexdiff setup [flags]
        rexdiff update
+       rexdiff uninstall
 
 Shows the changes on the current branch compared to the default branch.
 Give a pull request number or URL to show that pull request instead.
 
 Run "rexdiff setup" once to add rexdiff to Rex and to install the agent skill.
 Run "rexdiff update" to install the latest release.
+Run "rexdiff uninstall" to remove rexdiff and everything that setup installed.
 
 Flags:
 `
@@ -69,6 +71,9 @@ func run() int {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "update" {
 		return runUpdate()
+	}
+	if len(os.Args) > 1 && os.Args[1] == "uninstall" {
+		return runUninstall()
 	}
 
 	flags := flag.NewFlagSet("rexdiff", flag.ContinueOnError)
@@ -209,6 +214,45 @@ func runUpdate() int {
 		fmt.Fprintln(os.Stderr, "rexdiff update:", err)
 		return 1
 	}
+	return 0
+}
+
+// runUninstall removes what setup installed, the update check's cache, and
+// then the binary. The binary goes last, so a failed step can run again.
+func runUninstall() int {
+	if err := setup.Uninstall(os.Stdout); err != nil {
+		fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
+		return 1
+	}
+
+	if err := update.RemoveCache(); err != nil {
+		fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
+		return 1
+	}
+
+	binary, err := update.Binary()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
+		return 1
+	}
+
+	// npm also keeps the package and the link on PATH, so npm must remove them.
+	if update.InstalledWithNpm(binary) {
+		cmd := exec.Command("npm", "uninstall", "-g", "@segersniels/rexdiff")
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+		if err := cmd.Run(); err != nil {
+			fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
+			return 1
+		}
+		fmt.Println("✓ Binary: removed the npm package @segersniels/rexdiff")
+		return 0
+	}
+
+	if err := os.Remove(binary); err != nil {
+		fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
+		return 1
+	}
+	fmt.Println("✓ Binary: removed", binary)
 	return 0
 }
 

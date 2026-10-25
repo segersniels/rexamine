@@ -147,3 +147,76 @@ func TestLuaString(t *testing.T) {
 		t.Errorf("got %s", got)
 	}
 }
+
+func TestUninstallRemovesEverythingThatRunInstalled(t *testing.T) {
+	dir := useTempConfig(t)
+	installAgents(t, filepath.Join(dir, "claude"), filepath.Join(dir, ".codex"))
+	initPath := filepath.Join(dir, "config", "rex", "init.lua")
+	original := `rex.bind("cmd+e", "pane.zoom")` + "\n"
+	if err := os.MkdirAll(filepath.Dir(initPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(initPath, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := Options{Binary: "/opt/bin/rexdiff", Key: "ctrl+alt+cmd+d", Rex: true, Skill: true, Out: &bytes.Buffer{}}
+	if err := Run(testFiles, opts); err != nil {
+		t.Fatal(err)
+	}
+
+	// An agent that the user removed after setup still had the skill installed.
+	if err := os.RemoveAll(filepath.Join(dir, ".codex")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Uninstall(&bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := readFile(t, initPath); got != original {
+		t.Errorf("init.lua is %q, want %q", got, original)
+	}
+	for _, path := range []string{
+		filepath.Join(dir, "config", "rex", "rexdiff.lua"),
+		filepath.Join(dir, "claude", "skills", "rexdiff"),
+		filepath.Join(dir, ".agents", "skills", "rexdiff"),
+	} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("%s still exists", path)
+		}
+	}
+}
+
+func TestRemoveSetupCall(t *testing.T) {
+	tests := []struct {
+		name, text, want string
+		removed          bool
+	}{
+		{
+			name:    "current format",
+			text:    "a = 1\n\n" + setupCall(Options{Binary: "/bin/rexdiff", Key: "k"}) + "b = 2\n",
+			want:    "a = 1\nb = 2\n",
+			removed: true,
+		},
+		{
+			name:    "older format",
+			text:    "-- Added by `rexdiff setup`.\nrequire(\"rexdiff\").setup{\n  bin = \"/bin/rexdiff\",\n}\n",
+			want:    "",
+			removed: true,
+		},
+		{
+			name: "lines that the user wrote",
+			text: "require(\"rexdiff\").setup{}\n",
+			want: "require(\"rexdiff\").setup{}\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, removed := removeSetupCall(tt.text)
+			if got != tt.want || removed != tt.removed {
+				t.Errorf("removeSetupCall() = %q, %v; want %q, %v", got, removed, tt.want, tt.removed)
+			}
+		})
+	}
+}

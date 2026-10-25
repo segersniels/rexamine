@@ -73,3 +73,16 @@ Run `rexdiff update`. It finds out how you installed rexdiff and installs the la
 rexdiff checks GitHub for a new release once a day. When one is available, the footer tells you to run `rexdiff update`.
 
 To change the options of the Rex module, see [Rex module and agent skill](rex.md).
+
+## Uninstall
+
+```sh
+rexdiff uninstall
+```
+
+`rexdiff uninstall` removes everything that rexdiff installed:
+
+- The Rex module and the lines that `rexdiff setup` added to `init.lua`. Then it reloads the Rex configuration. If you wrote your own lines to load rexdiff, it tells you to remove them yourself.
+- The agent skill, for every supported agent, also for agents that you removed.
+- The cache of the update check.
+- The binary. For an npm install, it runs `npm uninstall -g @segersniels/rexdiff`.

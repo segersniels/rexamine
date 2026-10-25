@@ -42,15 +42,33 @@ func Check(current string) (Notice, bool) {
 		return Notice{}, false
 	}
 
-	dir, err := os.UserCacheDir()
+	dir, err := cacheDir()
 	if err != nil {
 		return Notice{}, false
 	}
-	latest, err := latestVersion(filepath.Join(dir, "rexdiff", "update.json"), fetchLatest)
+	latest, err := latestVersion(filepath.Join(dir, "update.json"), fetchLatest)
 	if err != nil || !newer(latest, current) {
 		return Notice{}, false
 	}
 	return Notice{Version: strings.TrimPrefix(latest, "v")}, true
+}
+
+// cacheDir is the directory where the check saves its answer.
+func cacheDir() (string, error) {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "rexdiff"), nil
+}
+
+// RemoveCache removes the saved answer of the check, for an uninstall.
+func RemoveCache() error {
+	dir, err := cacheDir()
+	if err != nil {
+		return err
+	}
+	return os.RemoveAll(dir)
 }
 
 // latestVersion reads the latest version from the cache file, or fetches it
@@ -137,10 +155,7 @@ func parse(version string) ([3]int, bool) {
 // Command gives the shell command that updates this installation to the
 // latest release.
 func Command() string {
-	binary, err := os.Executable()
-	if err == nil {
-		binary, err = filepath.EvalSymlinks(binary)
-	}
+	binary, err := Binary()
 	if err != nil {
 		return scriptCommand("")
 	}
@@ -149,12 +164,27 @@ func Command() string {
 	return commandFor(binary, home)
 }
 
-// commandFor picks the update command for the binary at path. npm runs the
-// binary from its package in node_modules. Other installations come from the
-// install script, which also updates the Rex module and the agent skill.
-func commandFor(path, home string) string {
+// Binary finds the file of this rexdiff binary, after symbolic links.
+func Binary() (string, error) {
+	binary, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return filepath.EvalSymlinks(binary)
+}
+
+// InstalledWithNpm checks whether the binary at path comes from the npm
+// package. npm runs the binary from its package in node_modules.
+func InstalledWithNpm(path string) bool {
 	separator := string(filepath.Separator)
-	if strings.Contains(path, separator+"node_modules"+separator) {
+	return strings.Contains(path, separator+"node_modules"+separator)
+}
+
+// commandFor picks the update command for the binary at path. Installations
+// that do not come from npm come from the install script, which also updates
+// the Rex module and the agent skill.
+func commandFor(path, home string) string {
+	if InstalledWithNpm(path) {
 		return "npm install -g @segersniels/rexdiff && rexdiff setup"
 	}
 
