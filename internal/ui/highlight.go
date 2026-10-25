@@ -81,18 +81,21 @@ func highlightHunk(lexer chroma.Lexer, style *chroma.Style, hunk diff.Hunk) [][]
 	return result
 }
 
-// highlightLines colors consecutive lines of one file. It expands tabs to four
-// spaces, like the rest of the diff view.
+// highlightLines colors consecutive lines of one file. It colors the lines as
+// displayText shows them, so the spans make up the same text as the rest of
+// the diff view.
 func highlightLines(lexer chroma.Lexer, style *chroma.Style, lines []string) [][]span {
+	shown := make([]string, len(lines))
 	result := make([][]span, len(lines))
 	for i, line := range lines {
-		result[i] = []span{{text: expandTabs(line)}}
+		shown[i] = displayText(line)
+		result[i] = []span{{text: shown[i]}}
 	}
 	if lexer == nil || len(lines) == 0 {
 		return result
 	}
 
-	iterator, err := chroma.Coalesce(lexer).Tokenise(nil, strings.Join(lines, "\n")+"\n")
+	iterator, err := chroma.Coalesce(lexer).Tokenise(nil, strings.Join(shown, "\n")+"\n")
 	if err != nil {
 		return result
 	}
@@ -106,7 +109,7 @@ func highlightLines(lexer chroma.Lexer, style *chroma.Style, lines []string) [][
 
 		var spans []span
 		for _, token := range tokens {
-			text := expandTabs(strings.TrimSuffix(token.Value, "\n"))
+			text := strings.TrimSuffix(token.Value, "\n")
 			if text == "" {
 				continue
 			}
@@ -122,9 +125,22 @@ func highlightLines(lexer chroma.Lexer, style *chroma.Style, lines []string) [][
 	return result
 }
 
-// expandTabs replaces each tab with four spaces.
-func expandTabs(text string) string {
-	return strings.ReplaceAll(text, "\t", "    ")
+// displayText prepares a code line for the terminal. It expands each tab to
+// four spaces and drops the carriage return of a Windows line ending. It shows
+// other control characters as symbols, such as ␍, because the terminal would
+// act on them: a carriage return moves the cursor and an escape changes colors.
+func displayText(line string) string {
+	line = strings.ReplaceAll(strings.TrimSuffix(line, "\r"), "\t", "    ")
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r < 0x20:
+			return 0x2400 + r // the Control Pictures block, such as ␍ for \r
+		case r == 0x7f:
+			return '␡'
+		default:
+			return r
+		}
+	}, line)
 }
 
 // spansIn cuts the parts of spans that lie between the byte offsets start and

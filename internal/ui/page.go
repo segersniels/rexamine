@@ -110,7 +110,7 @@ func layoutFile(index int, file diff.File, highlighted highlightedFile, width in
 				number = line.OldLine
 			}
 
-			text := expandTabs(line.Text)
+			text := displayText(line.Text)
 
 			// Most lines fit, and a string is never wider than its length in bytes.
 			chunks := []string{text}

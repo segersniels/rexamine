@@ -38,6 +38,22 @@ func TestHighlightLinesLeavesUnknownFilesPlain(t *testing.T) {
 	}
 }
 
+func TestHighlightLinesShowsControlCharactersAsSymbols(t *testing.T) {
+	lines := []string{"s := \"x\ry\"", "b := 2\r", "c := \"\x1b[31m\""}
+	want := []string{"s := \"x␍y\"", "b := 2", "c := \"␛[31m\""}
+
+	got := highlightLines(lexers.Match("main.go"), codeStyle("dark"), lines)
+	for i, spans := range got {
+		text := ""
+		for _, s := range spans {
+			text += s.text
+		}
+		if text != want[i] {
+			t.Errorf("line %d shows %q, want %q", i, text, want[i])
+		}
+	}
+}
+
 func TestSpansInCutsAcrossSpans(t *testing.T) {
 	spans := []span{{text: "abc", color: "#111111"}, {text: "def", color: "#222222"}}
 
