@@ -422,7 +422,7 @@ func (m *Model) layout(files []diff.File) {
 }
 
 // lineKeyAt returns the key of the diff line on row i, if row i is a code row.
-func (m Model) lineKeyAt(i int) (lineKey, bool) {
+func (m *Model) lineKeyAt(i int) (lineKey, bool) {
 	if i < 0 || i >= len(m.rows) || m.rows[i].kind != codeRow {
 		return lineKey{}, false
 	}
@@ -432,11 +432,22 @@ func (m Model) lineKeyAt(i int) (lineKey, bool) {
 	return lineKey{m.files[r.file].Path, line.Kind, line.OldLine, line.NewLine}, true
 }
 
-// findLine finds the first row that shows the diff line with the key.
-func (m Model) findLine(target lineKey) (int, bool) {
-	for i := range m.rows {
-		if key, ok := m.lineKeyAt(i); ok && key == target {
-			return i, true
+// findLine finds the first row that shows the diff line with the key. It
+// searches only the rows of the key's file, because a large diff has many rows.
+func (m *Model) findLine(target lineKey) (int, bool) {
+	for f, start := range m.fileStarts {
+		if m.files[f].Path != target.path {
+			continue
+		}
+
+		end := len(m.rows)
+		if f+1 < len(m.fileStarts) {
+			end = m.fileStarts[f+1]
+		}
+		for i := start; i < end; i++ {
+			if key, ok := m.lineKeyAt(i); ok && key == target {
+				return i, true
+			}
 		}
 	}
 	return 0, false
