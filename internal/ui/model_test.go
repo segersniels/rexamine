@@ -9,6 +9,7 @@ import (
 
 	"github.com/segersniels/rexdiff/internal/github"
 	"github.com/segersniels/rexdiff/internal/source"
+	"github.com/segersniels/rexdiff/internal/update"
 )
 
 const testDiff = `diff --git a/src/settings-mapper.ts b/src/settings-mapper.ts
@@ -295,5 +296,27 @@ func TestCollapsedFileStaysCollapsedAfterAReload(t *testing.T) {
 
 	if hasCodeRows(model.(Model)) {
 		t.Error("the file expanded after a reload")
+	}
+}
+
+func TestUpdateNoticeWrapsInNarrowScreens(t *testing.T) {
+	notice := update.Notice{Version: "9.9.9", Command: "curl -fsSL https://raw.githubusercontent.com/segersniels/rexdiff/main/scripts/install.sh | sh"}
+
+	for _, width := range []int{24, 40, 200} {
+		var model tea.Model = newLoadedModel(t, &fakeSender{}, width, 60)
+		model, _ = model.Update(notice)
+		view := model.View()
+
+		if !strings.Contains(ansi.Strip(view), "rexdiff 9.9.9") {
+			t.Errorf("width %d: view does not show the notice", width)
+		}
+		for i, line := range strings.Split(view, "\n") {
+			if got := ansi.StringWidth(line); got > width {
+				t.Errorf("width %d: line %d is %d columns wide: %q", width, i+1, got, ansi.Strip(line))
+			}
+		}
+		if width == 200 && !strings.Contains(ansi.Strip(view), notice.Command) {
+			t.Errorf("view does not show the whole update command:\n%s", ansi.Strip(view))
+		}
 	}
 }

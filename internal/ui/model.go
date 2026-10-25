@@ -20,6 +20,7 @@ import (
 	"github.com/segersniels/rexdiff/internal/diff"
 	"github.com/segersniels/rexdiff/internal/github"
 	"github.com/segersniels/rexdiff/internal/source"
+	"github.com/segersniels/rexdiff/internal/update"
 )
 
 // watchInterval is how often a local review checks the repository for changes.
@@ -108,6 +109,9 @@ type Model struct {
 
 	status   string
 	statusID int
+
+	// newRelease tells about a newer release of rexdiff, or is nil.
+	newRelease *update.Notice
 }
 
 // New creates the review screen. Comments go to the sender. turns reports when
@@ -209,6 +213,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m, m.setStatus(errorStyle.Render(msg.err.Error()))
 		}
+		return m, nil
+
+	// main sends the notice when its check finds a newer release.
+	case update.Notice:
+		m.newRelease = &msg
+		m.clamp()
 		return m, nil
 
 	case clearStatusMsg:
@@ -851,6 +861,12 @@ func (m Model) footerView() string {
 	lines := strings.Split(footer, "\n")
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, m.width, "…")
+	}
+
+	// The notice wraps instead of being cut, so the update command stays complete in a narrow pane.
+	if m.newRelease != nil {
+		notice := accentStyle.Render("rexdiff "+m.newRelease.Version+" is available:") + " " + dimStyle.Render(m.newRelease.Command)
+		lines = append([]string{ansi.Wrap(" "+notice, m.width, "/")}, lines...)
 	}
 	return strings.Join(lines, "\n")
 }

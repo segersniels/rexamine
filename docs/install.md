@@ -70,4 +70,6 @@ rexdiff setup
 
 Install the new version in the same way, then run `rexdiff setup` again to update the Rex module and the agent skill. `rexdiff setup` does not change an `init.lua` that already loads rexdiff.
 
+rexdiff checks GitHub for a new release once a day. When one is available, the footer shows it with the update command for your installation: npm for an npm install, or the install script for other installations.
+
 To change the options of the Rex module, see [Rex module and agent skill](rex.md).

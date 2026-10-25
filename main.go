@@ -20,6 +20,7 @@ import (
 	"github.com/segersniels/rexdiff/internal/setup"
 	"github.com/segersniels/rexdiff/internal/source"
 	"github.com/segersniels/rexdiff/internal/ui"
+	"github.com/segersniels/rexdiff/internal/update"
 )
 
 // version is set at build time by the release.
@@ -117,6 +118,13 @@ func run() int {
 	}
 
 	program := tea.NewProgram(ui.New(src, sender, turns, markdownStyle), tea.WithAltScreen(), tea.WithMouseCellMotion())
+
+	// The check can wait on the network, so it runs beside the screen and never delays it.
+	go func() {
+		if notice, ok := update.Check(version); ok {
+			program.Send(notice)
+		}
+	}()
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "rexdiff:", err)
 		return 1
