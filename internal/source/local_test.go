@@ -226,3 +226,41 @@ func TestLastTurnBeforeTheFirstTurnShowsNoChanges(t *testing.T) {
 		t.Errorf("expected no changes before the first turn:\n%s", review.Diff)
 	}
 }
+
+func TestLastTurnWithoutEditsKeepsThePreviousTurnInView(t *testing.T) {
+	t.Chdir(newRepo(t))
+
+	previous, err := Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("agent.txt", []byte("agent\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// The next turn starts and only answers a question, so the working tree stays the same.
+	latest, err := Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	review, err := Local{Scope: LastTurn, TurnStart: latest, PreviousTurnStart: previous}.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(review.Diff, "b/agent.txt") {
+		t.Errorf("diff does not keep the previous turn's change:\n%s", review.Diff)
+	}
+
+	// Once the latest turn edits a file, only its own change shows.
+	if err := os.WriteFile("second.txt", []byte("second\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	review, err = Local{Scope: LastTurn, TurnStart: latest, PreviousTurnStart: previous}.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(review.Diff, "b/second.txt") || strings.Contains(review.Diff, "agent.txt") {
+		t.Errorf("diff does not show only the latest turn's change:\n%s", review.Diff)
+	}
+}

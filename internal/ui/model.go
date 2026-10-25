@@ -193,6 +193,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.setStatus(errorStyle.Render("Save the start of the agent's turn: " + msg.err.Error()))
 		}
 		local := m.source.(source.Local)
+
+		// The turn that just ended changed files, so its start becomes the fallback for a turn without edits.
+		if local.TurnStart != "" && msg.tree != local.TurnStart {
+			local.PreviousTurnStart = local.TurnStart
+		}
 		local.TurnStart = msg.tree
 		m.source = local
 		if local.Scope != source.LastTurn {

@@ -50,8 +50,12 @@ type Local struct {
 	Scope Scope
 
 	// TurnStart is the snapshot of the working tree from when the agent
-	// started its last turn, or empty before the first turn.
+	// started its latest turn, or empty before the first turn.
 	TurnStart string
+
+	// PreviousTurnStart is the snapshot from the start of the last turn before
+	// the latest one that changed files, or empty if there was none.
+	PreviousTurnStart string
 }
 
 // Load runs git and returns the changes in the scope.
@@ -130,10 +134,12 @@ func (l Local) loadLastTurn(root, branch string) (Review, error) {
 		Head:    "working tree",
 	}
 
+	waiting := review
+	waiting.Title = "No agent changes yet on " + branch
+
 	// Before the first turn there is nothing to compare, so the page shows no changes.
 	if l.TurnStart == "" {
-		review.Title = "Waiting for the agent's next turn on " + branch
-		return review, nil
+		return waiting, nil
 	}
 
 	now, err := snapshot(root)
@@ -141,7 +147,16 @@ func (l Local) loadLastTurn(root, branch string) (Review, error) {
 		return Review{}, err
 	}
 
-	review.Diff, err = git(root, "diff", "--no-color", "--no-ext-diff", "-M", l.TurnStart, now)
+	// A turn without edits, such as an answer to a question, keeps the changes of the turn before it in view.
+	base := l.TurnStart
+	if now == l.TurnStart {
+		base = l.PreviousTurnStart
+	}
+	if base == "" {
+		return waiting, nil
+	}
+
+	review.Diff, err = git(root, "diff", "--no-color", "--no-ext-diff", "-M", base, now)
 	if err != nil {
 		return Review{}, err
 	}

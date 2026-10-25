@@ -320,3 +320,17 @@ func TestUpdateNoticeWrapsInNarrowScreens(t *testing.T) {
 		}
 	}
 }
+
+func TestTurnWithoutEditsKeepsThePreviousTurnStart(t *testing.T) {
+	var model tea.Model = New(source.Local{}, &fakeSender{}, make(chan struct{}), "dark")
+
+	// Each snapshot is the working tree at the start of a turn. The second turn changes nothing.
+	for _, tree := range []string{"first", "second", "second"} {
+		model, _ = model.Update(snapshotMsg{tree: tree})
+	}
+
+	local := model.(Model).source.(source.Local)
+	if local.TurnStart != "second" || local.PreviousTurnStart != "first" {
+		t.Errorf("got turn start %q and previous %q, want second and first", local.TurnStart, local.PreviousTurnStart)
+	}
+}

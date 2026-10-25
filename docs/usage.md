@@ -37,6 +37,7 @@ rexdiff https://github.com/owner/repo/pull/123
 When rexdiff runs in a pane beside an agent in Rex, it follows the status that the agent reports to Rex. When the agent starts to work, rexdiff saves a snapshot of the working tree. The last-turn view compares that snapshot with the working tree, so it shows only the changes of the current or most recent turn.
 
 - The view is empty until the agent starts its next turn. A turn that already runs when rexdiff opens has no snapshot.
+- A turn without edits, such as an answer to a question, keeps the changes of the turn before it in view until the agent changes a file.
 - The snapshot does not change your index or your staged changes.
 - The agent must report its status to Rex, as Claude Code does.
 
