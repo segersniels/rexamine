@@ -1,0 +1,33 @@
+{
+  "name": "@segersniels/rexdiff",
+  "version": "0.0.0",
+  "description": "Review a diff beside your coding agent in Rex, and send comments on its lines straight into the agent's prompt.",
+  "bin": {
+    "rexdiff": "bin/rexdiff.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/segersniels/rexdiff.git"
+  },
+  "homepage": "https://github.com/segersniels/rexdiff#readme",
+  "bugs": {
+    "url": "https://github.com/segersniels/rexdiff/issues"
+  },
+  "keywords": [
+    "rex",
+    "diff",
+    "code-review",
+    "pull-request",
+    "claude-code",
+    "agent",
+    "tui"
+  ],
+  "author": "Niels Segers",
+  "license": "MIT"
+}
