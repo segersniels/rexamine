@@ -46,6 +46,11 @@ type (
 		err    error
 	}
 	watchMsg       struct{ gen int }
+	turnStartedMsg struct{}
+	snapshotMsg    struct {
+		tree string
+		err  error
+	}
 	sentMsg        struct{ err error }
 	openedMsg      struct{ err error }
 	clearStatusMsg struct{ id int }
@@ -64,6 +69,9 @@ type Model struct {
 	source        source.Source
 	sender        agent.Sender
 	markdownStyle string
+
+	// turns reports when the agent starts a turn, or is nil without an agent to watch.
+	turns <-chan struct{}
 
 	keys        browseKeys
 	composeKeys composeKeys
@@ -102,9 +110,10 @@ type Model struct {
 	statusID int
 }
 
-// New creates the review screen. Comments go to the sender. markdownStyle is
-// a glamour style name, such as "dark".
-func New(src source.Source, sender agent.Sender, markdownStyle string) Model {
+// New creates the review screen. Comments go to the sender. turns reports when
+// the agent starts a turn, or is nil without an agent to watch. markdownStyle
+// is a glamour style name, such as "dark".
+func New(src source.Source, sender agent.Sender, turns <-chan struct{}, markdownStyle string) Model {
 	composer := textarea.New()
 	composer.Placeholder = "Ask a question about these lines…"
 	composer.ShowLineNumbers = false
@@ -118,11 +127,15 @@ func New(src source.Source, sender agent.Sender, markdownStyle string) Model {
 	keys := newBrowseKeys()
 	keys.Toggle.SetEnabled(local)
 	keys.Open.SetEnabled(!local)
+	if turns != nil {
+		keys.Toggle.SetHelp("t", "branch/uncommitted/last turn")
+	}
 
 	return Model{
 		source:        src,
 		sender:        sender,
 		markdownStyle: markdownStyle,
+		turns:         turns,
 		keys:          keys,
 		composeKeys:   newComposeKeys(sender.Target()),
 		help:          help.New(),
@@ -137,7 +150,11 @@ func New(src source.Source, sender agent.Sender, markdownStyle string) Model {
 
 // Init starts the first load.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(loadReview(m.source, m.loadGen), m.spinner.Tick)
+	cmds := []tea.Cmd{loadReview(m.source, m.loadGen), m.spinner.Tick}
+	if m.turns != nil {
+		cmds = append(cmds, waitForTurn(m.turns))
+	}
+	return tea.Batch(cmds...)
 }
 
 // Update handles a message and returns the next state.
@@ -155,6 +172,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case watchMsg:
 		if msg.gen != m.watchGen {
+			return m, nil
+		}
+		return m, m.reload()
+
+	case turnStartedMsg:
+		return m, tea.Batch(takeSnapshot, waitForTurn(m.turns))
+
+	case snapshotMsg:
+		if msg.err != nil {
+			return m, m.setStatus(errorStyle.Render("Save the start of the agent's turn: " + msg.err.Error()))
+		}
+		local := m.source.(source.Local)
+		local.TurnStart = msg.tree
+		m.source = local
+		if local.Scope != source.LastTurn {
 			return m, nil
 		}
 		return m, m.reload()
@@ -271,6 +303,11 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Toggle):
 		local := m.source.(source.Local)
 		local.Scope = local.Scope.Next()
+
+		// Without an agent to watch, there are no turns to show.
+		if local.Scope == source.LastTurn && m.turns == nil {
+			local.Scope = local.Scope.Next()
+		}
 		m.source = local
 		return m, tea.Batch(m.reload(), m.setStatus(dimStyle.Render("Showing "+local.Scope.String()+"…")))
 	case key.Matches(msg, m.keys.Reload):
@@ -824,6 +861,23 @@ func loadReview(src source.Source, gen int) tea.Cmd {
 		review, err := src.Load()
 		return loadedMsg{gen, review, err}
 	}
+}
+
+// waitForTurn waits in the background until the agent starts a turn. When the
+// watch ends, it returns no message, so the UI stops waiting.
+func waitForTurn(turns <-chan struct{}) tea.Cmd {
+	return func() tea.Msg {
+		if _, ok := <-turns; !ok {
+			return nil
+		}
+		return turnStartedMsg{}
+	}
+}
+
+// takeSnapshot saves the working tree at the start of the agent's turn.
+func takeSnapshot() tea.Msg {
+	tree, err := source.Snapshot()
+	return snapshotMsg{tree, err}
 }
 
 // send delivers a comment in the background.

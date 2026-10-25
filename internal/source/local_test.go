@@ -176,3 +176,53 @@ func TestLocalOutsideARepository(t *testing.T) {
 		t.Error("expected an error outside a git repository")
 	}
 }
+
+func TestLastTurnShowsOnlyTheChangesSinceTheTurnStarted(t *testing.T) {
+	t.Chdir(newRepo(t))
+
+	start, err := Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The agent edits a changed file and creates a new one during its turn.
+	if err := os.WriteFile("base.txt", []byte("base\nedited\nby agent\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("agent.txt", []byte("agent\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	review, err := Local{Scope: LastTurn, TurnStart: start}.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{"b/agent.txt", "+by agent"} {
+		if !strings.Contains(review.Diff, want) {
+			t.Errorf("diff does not show %q:\n%s", want, review.Diff)
+		}
+	}
+	for _, notWant := range []string{"committed.txt", "untracked.txt", "+edited"} {
+		if strings.Contains(review.Diff, notWant) {
+			t.Errorf("diff shows %q from before the turn:\n%s", notWant, review.Diff)
+		}
+	}
+
+	// The snapshot uses its own index, so the user's staged changes stay as they are.
+	if staged, err := git("", "diff", "--cached", "--name-only"); err != nil || staged != "" {
+		t.Errorf("snapshot changed the index: %q, %v", staged, err)
+	}
+}
+
+func TestLastTurnBeforeTheFirstTurnShowsNoChanges(t *testing.T) {
+	t.Chdir(newRepo(t))
+
+	review, err := Local{Scope: LastTurn}.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.Diff != "" {
+		t.Errorf("expected no changes before the first turn:\n%s", review.Diff)
+	}
+}

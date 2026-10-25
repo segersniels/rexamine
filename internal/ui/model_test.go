@@ -58,7 +58,7 @@ func newLoadedModel(t *testing.T, sender *fakeSender, width, height int) Model {
 	t.Helper()
 	review := testReview()
 
-	var model tea.Model = New(fakeSource{review}, sender, "dark")
+	var model tea.Model = New(fakeSource{review}, sender, nil, "dark")
 	model, _ = model.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	model, _ = model.Update(loadedMsg{gen: 1, review: review})
 	return model.(Model)

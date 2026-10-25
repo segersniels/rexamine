@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"errors"
 	"flag"
@@ -94,9 +95,19 @@ func run() int {
 		return 1
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	var sender agent.Sender = agent.Clipboard{}
+	var turns <-chan struct{}
 	if *agentPane != "" {
-		sender = agent.RexPane{Session: os.Getenv("REX_SESSION"), Block: *agentPane}
+		pane := agent.RexPane{Session: os.Getenv("REX_SESSION"), Block: *agentPane}
+		sender = pane
+
+		// Only local changes can show the agent's last turn. Without Rex events, the other views still work.
+		if _, local := src.(source.Local); local {
+			turns, _ = pane.WatchTurns(ctx)
+		}
 	}
 
 	// Ask for the background color before Bubble Tea takes over the terminal.
@@ -105,7 +116,7 @@ func run() int {
 		markdownStyle = "dark"
 	}
 
-	program := tea.NewProgram(ui.New(src, sender, markdownStyle), tea.WithAltScreen(), tea.WithMouseCellMotion())
+	program := tea.NewProgram(ui.New(src, sender, turns, markdownStyle), tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "rexdiff:", err)
 		return 1

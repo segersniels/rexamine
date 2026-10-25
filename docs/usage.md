@@ -2,7 +2,7 @@
 
 ## What rexdiff shows
 
-- **Your local changes**: everything on the current branch compared to the default branch, or only the uncommitted changes. Untracked files are included. The view updates as files change.
+- **Your local changes**: everything on the current branch compared to the default branch, only the uncommitted changes, or only what the agent changed in its last turn. Untracked files are included. The view updates as files change.
 - **A GitHub pull request**: the description, reviews, comments, and diff, through the [GitHub CLI](https://cli.github.com).
 
 ```sh
@@ -14,23 +14,31 @@ rexdiff https://github.com/owner/repo/pull/123
 
 ## Keys
 
-| Key                       | Action                                         |
-| ------------------------- | ---------------------------------------------- |
-| `j` / `k`, arrows, wheel  | Move down or up                                |
-| `ctrl+d` / `ctrl+u`       | Move half a page                               |
-| `f` / `b`, page keys      | Move a page                                    |
-| `g` / `G`                 | Go to the top or the end                       |
-| `]` / `[`                 | Go to the next or previous file                |
-| `z`, click a file title   | Collapse or expand the file                    |
-| `v`                       | Select lines                                   |
-| `c`, `enter`              | Comment on the selection or the current line   |
-| Mouse drag over lines     | Select the lines and comment on them           |
-| Click a line number       | Comment on that line                           |
-| `t`                       | Switch between branch and uncommitted changes  |
-| `r`                       | Reload                                         |
-| `o`                       | Open the pull request on GitHub                |
-| `?`                       | Show all keys                                  |
-| `q`                       | Quit                                           |
+| Key                      | Action                                                    |
+| ------------------------ | --------------------------------------------------------- |
+| `j` / `k`, arrows, wheel | Move down or up                                           |
+| `ctrl+d` / `ctrl+u`      | Move half a page                                          |
+| `f` / `b`, page keys     | Move a page                                               |
+| `g` / `G`                | Go to the top or the end                                  |
+| `]` / `[`                | Go to the next or previous file                           |
+| `z`, click a file title  | Collapse or expand the file                               |
+| `v`                      | Select lines                                              |
+| `c`, `enter`             | Comment on the selection or the current line              |
+| Mouse drag over lines    | Select the lines and comment on them                      |
+| Click a line number      | Comment on that line                                      |
+| `t`                      | Switch between branch, uncommitted, and last-turn changes |
+| `r`                      | Reload                                                    |
+| `o`                      | Open the pull request on GitHub                           |
+| `?`                      | Show all keys                                             |
+| `q`                      | Quit                                                      |
+
+## Last agent turn
+
+When rexdiff runs in a pane beside an agent in Rex, it follows the status that the agent reports to Rex. When the agent starts to work, rexdiff saves a snapshot of the working tree. The last-turn view compares that snapshot with the working tree, so it shows only the changes of the current or most recent turn.
+
+- The view is empty until the agent starts its next turn. A turn that already runs when rexdiff opens has no snapshot.
+- The snapshot does not change your index or your staged changes.
+- The agent must report its status to Rex, as Claude Code does.
 
 ## Comments
 

@@ -13,7 +13,7 @@ rexdiff shows a diff in a Rex pane beside this session. The user selects lines i
 rex do -s "$REX_SESSION" -b "$REX_BLOCK" rexdiff pr=<PR URL or number>
 ```
 
-- Leave out `pr=` to show the local changes of the current branch. The user can press `t` in the pane to switch to uncommitted changes only.
+- Leave out `pr=` to show the local changes of the current branch. The user can press `t` in the pane to switch to uncommitted changes only, or to the changes of your last turn.
 - Run the command again with `pr=` to show another pull request. Run it without `pr=` to close the pane.
 - If `REX_SESSION` or `REX_BLOCK` is not set, tell the user that the pane only works inside Rex. They can still run `rexdiff` in another terminal, and it copies comments to the clipboard.
 - Do not wait for the pane or read its output. The pane is for the user.

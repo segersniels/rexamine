@@ -50,6 +50,7 @@ Outside Rex, rexdiff copies each comment to the clipboard, so it works with any 
 - **Local changes and pull requests**: review your branch, only the uncommitted changes, or a GitHub pull request with its description, reviews, and comments.
 - **Comments into the prompt**: select lines with `v` or the mouse, and send a comment with the lines to the agent pane as a real paste. The agent waits for you to submit.
 - **Live updates**: the view follows your edits, including untracked files.
+- **Last agent turn**: inside Rex, press `t` to see only what the agent changed since it started its last turn.
 - **Made for narrow panes**: text wraps to the pane's width and reflows when you resize it.
 - **Collapsible files**: hide a file with `z` or a click on its title.
 - **Light and dark themes** that follow your terminal.

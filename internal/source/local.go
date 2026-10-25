@@ -23,27 +23,35 @@ const (
 	// Uncommitted shows only changes since the last commit, including
 	// untracked files.
 	Uncommitted
+
+	// LastTurn shows the changes since the agent started its last turn.
+	LastTurn
 )
 
-// Next returns the other scope.
+// Next returns the scope after s, in the order branch, uncommitted, last turn.
 func (s Scope) Next() Scope {
-	if s == Branch {
-		return Uncommitted
-	}
-	return Branch
+	return (s + 1) % 3
 }
 
 // String names the scope for messages.
 func (s Scope) String() string {
-	if s == Uncommitted {
+	switch s {
+	case Uncommitted:
 		return "uncommitted changes"
+	case LastTurn:
+		return "last agent turn"
+	default:
+		return "branch changes"
 	}
-	return "branch changes"
 }
 
 // Local loads the changes in the git repository of the working directory.
 type Local struct {
 	Scope Scope
+
+	// TurnStart is the snapshot of the working tree from when the agent
+	// started its last turn, or empty before the first turn.
+	TurnStart string
 }
 
 // Load runs git and returns the changes in the scope.
@@ -61,6 +69,10 @@ func (l Local) Load() (Review, error) {
 	branch = strings.TrimSpace(branch)
 	if branch == "" {
 		branch = "detached HEAD"
+	}
+
+	if l.Scope == LastTurn {
+		return l.loadLastTurn(root, branch)
 	}
 
 	base, baseName, headName := "HEAD", "last commit", "working tree"
@@ -106,6 +118,105 @@ func (l Local) Load() (Review, error) {
 		Head:    headName,
 		Diff:    tracked + untracked,
 	}, nil
+}
+
+// loadLastTurn compares the snapshot from the start of the agent's last turn
+// with the working tree now.
+func (l Local) loadLastTurn(root, branch string) (Review, error) {
+	review := Review{
+		Context: filepath.Base(root),
+		Title:   "Last agent turn on " + branch,
+		Base:    "turn start",
+		Head:    "working tree",
+	}
+
+	// Before the first turn there is nothing to compare, so the page shows no changes.
+	if l.TurnStart == "" {
+		review.Title = "Waiting for the agent's next turn on " + branch
+		return review, nil
+	}
+
+	now, err := snapshot(root)
+	if err != nil {
+		return Review{}, err
+	}
+
+	review.Diff, err = git(root, "diff", "--no-color", "--no-ext-diff", "-M", l.TurnStart, now)
+	if err != nil {
+		return Review{}, err
+	}
+	return review, nil
+}
+
+// Snapshot saves the working tree of the repository in the working directory,
+// with untracked files, and returns the ID of the saved tree.
+func Snapshot() (string, error) {
+	root, err := git("", "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", errors.New("not inside a git repository")
+	}
+	return snapshot(strings.TrimSpace(root))
+}
+
+// snapshot adds every file to a copy of the index and writes it as a tree.
+// The real index stays as it is, so the user's staged changes do not change.
+func snapshot(root string) (string, error) {
+	dir, err := os.MkdirTemp("", "rexdiff-index-*")
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+
+	index := filepath.Join(dir, "index")
+	if err := copyIndex(root, index); err != nil {
+		return "", err
+	}
+	env := []string{"GIT_INDEX_FILE=" + index}
+
+	// With --ignore-errors, git exits with 1 when it cannot add a file, such as
+	// a temporary file that an editor removed. It still adds the other files.
+	_, err = gitEnv(root, env, "add", "-A", "--ignore-errors")
+	var exitErr *exec.ExitError
+	addedSome := errors.As(err, &exitErr) && exitErr.ExitCode() == 1
+	if err != nil && !addedSome {
+		return "", err
+	}
+
+	tree, err := gitEnv(root, env, "write-tree")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(tree), nil
+}
+
+// copyIndex copies the index of the repository to dst, so git only reads the
+// files that changed since the index was written. A repository without an
+// index has nothing to copy, and git reads a missing index as empty.
+func copyIndex(root, dst string) error {
+	src, err := git(root, "rev-parse", "--path-format=absolute", "--git-path", "index")
+	if err != nil {
+		return err
+	}
+	src = strings.TrimSpace(src)
+
+	content, err := os.ReadFile(src)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(dst, content, 0o600); err != nil {
+		return err
+	}
+
+	// git compares the time of the index with the times of the files to find
+	// files that changed right after the index was written, so keep it.
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	return os.Chtimes(dst, info.ModTime(), info.ModTime())
 }
 
 // defaultBranch finds the branch that pull requests merge into, preferring
@@ -225,9 +336,16 @@ func (e *gitError) Unwrap() error { return e.err }
 
 // git runs a git command in dir and returns what it printed.
 func git(dir string, args ...string) (string, error) {
+	return gitEnv(dir, nil, args...)
+}
+
+// gitEnv runs a git command in dir with extra environment variables, such as
+// GIT_INDEX_FILE, and returns what it printed.
+func gitEnv(dir string, env []string, args ...string) (string, error) {
 	var stderr bytes.Buffer
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), env...)
 	cmd.Stderr = &stderr
 
 	out, err := cmd.Output()
