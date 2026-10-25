@@ -113,6 +113,62 @@ func TestLocalWithoutCommits(t *testing.T) {
 	}
 }
 
+func TestUntrackedDiffMatchesGit(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"text.txt":       "a\nb\n",
+		"no-newline.txt": "x",
+		"empty.txt":      "",
+		"blank-line.txt": "\n",
+		"binary.dat":     "a\x00b",
+		"with space.txt": "one\n",
+		"dir/nested.txt": "nested\n",
+	}
+	for name, text := range files {
+		if err := os.MkdirAll(filepath.Join(dir, filepath.Dir(name)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "run.sh"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("text.txt", filepath.Join(dir, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command("git", "-C", dir, "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+
+	got, err := untrackedDiff(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	paths, err := git(dir, "ls-files", "--others", "-z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want strings.Builder
+	for _, path := range strings.Split(strings.TrimRight(paths, "\x00"), "\x00") {
+		patch, _ := git(dir, "diff", "--no-color", "--no-ext-diff", "--no-index", "--", "/dev/null", path)
+		want.WriteString(patch)
+	}
+
+	// The parser ignores index lines, and git ends a "+++" path that has a space with a tab.
+	var lines []string
+	for _, line := range strings.Split(want.String(), "\n") {
+		if !strings.HasPrefix(line, "index ") {
+			lines = append(lines, strings.TrimSuffix(line, "\t"))
+		}
+	}
+	if want := strings.Join(lines, "\n"); got != want {
+		t.Errorf("diff differs from git:\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestLocalOutsideARepository(t *testing.T) {
 	t.Chdir(t.TempDir())
 

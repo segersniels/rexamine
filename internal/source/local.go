@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -121,8 +123,12 @@ func defaultBranch(root string) (string, error) {
 	return "", errors.New("cannot find the default branch; set it with: git remote set-head origin --auto")
 }
 
+// binaryCheckSize is how much of a file git reads to decide that it is binary.
+const binaryCheckSize = 8000
+
 // untrackedDiff shows each untracked file as a new file. git diff leaves
-// these out.
+// these out. One git process per file takes seconds in a repository with many
+// untracked files, so the diff is written here instead.
 func untrackedDiff(root string) (string, error) {
 	list, err := git(root, "ls-files", "--others", "--exclude-standard", "-z")
 	if err != nil {
@@ -135,16 +141,73 @@ func untrackedDiff(root string) (string, error) {
 			continue
 		}
 
-		// git diff --no-index exits with 1 when the files differ, which they always do here.
-		patch, err := git(root, "diff", "--no-color", "--no-ext-diff", "--no-index", "--", "/dev/null", path)
-		var exitErr *exec.ExitError
-		differs := errors.As(err, &exitErr) && exitErr.ExitCode() == 1
-		if err != nil && !differs {
+		err := writeNewFileDiff(&out, root, path)
+
+		// Editors create and remove temporary files all the time, so a file can be gone already.
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
 			return "", err
 		}
-		out.WriteString(patch)
 	}
 	return out.String(), nil
+}
+
+// writeNewFileDiff writes the diff that git diff --no-index prints for a new
+// file, without the index line.
+func writeNewFileDiff(out *strings.Builder, root, path string) error {
+	full := filepath.Join(root, path)
+	info, err := os.Lstat(full)
+	if err != nil {
+		return err
+	}
+
+	// A symbolic link stores the path it points to.
+	mode := "100644"
+	var content []byte
+	if info.Mode()&fs.ModeSymlink != 0 {
+		mode = "120000"
+		target, err := os.Readlink(full)
+		if err != nil {
+			return err
+		}
+		content = []byte(target)
+	} else {
+		if info.Mode()&0o111 != 0 {
+			mode = "100755"
+		}
+		content, err = os.ReadFile(full)
+		if err != nil {
+			return err
+		}
+	}
+
+	fmt.Fprintf(out, "diff --git a/%s b/%s\nnew file mode %s\n", path, path, mode)
+	if len(content) == 0 {
+		return nil
+	}
+	if bytes.IndexByte(content[:min(len(content), binaryCheckSize)], 0) >= 0 {
+		fmt.Fprintf(out, "Binary files /dev/null and b/%s differ\n", path)
+		return nil
+	}
+
+	text := string(content)
+	endsWithNewline := strings.HasSuffix(text, "\n")
+	lines := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
+
+	lineRange := "1"
+	if len(lines) != 1 {
+		lineRange = fmt.Sprintf("1,%d", len(lines))
+	}
+	fmt.Fprintf(out, "--- /dev/null\n+++ b/%s\n@@ -0,0 +%s @@\n", path, lineRange)
+	for _, line := range lines {
+		out.WriteString("+" + line + "\n")
+	}
+	if !endsWithNewline {
+		out.WriteString("\\ No newline at end of file\n")
+	}
+	return nil
 }
 
 // gitError keeps git's own message next to its exit status.
