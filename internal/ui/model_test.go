@@ -7,6 +7,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/segersniels/rexdiff/internal/agent"
+	"github.com/segersniels/rexdiff/internal/diff"
 	"github.com/segersniels/rexdiff/internal/github"
 	"github.com/segersniels/rexdiff/internal/source"
 	"github.com/segersniels/rexdiff/internal/update"
@@ -77,6 +79,8 @@ func press(m Model, keys ...string) (Model, tea.Cmd) {
 			msg = tea.KeyMsg{Type: tea.KeyEnter}
 		case "esc":
 			msg = tea.KeyMsg{Type: tea.KeyEsc}
+		case "shift+tab":
+			msg = tea.KeyMsg{Type: tea.KeyShiftTab}
 		}
 		model, cmd = model.Update(msg)
 	}
@@ -332,5 +336,81 @@ func TestTurnWithoutEditsKeepsThePreviousTurnStart(t *testing.T) {
 	local := model.(Model).source.(source.Local)
 	if local.TurnStart != "second" || local.PreviousTurnStart != "first" {
 		t.Errorf("got turn start %q and previous %q, want second and first", local.TurnStart, local.PreviousTurnStart)
+	}
+}
+
+func TestShiftTabSwitchesAPullRequestCommentToGitHub(t *testing.T) {
+	sender := &fakeSender{}
+	m := newLoadedModel(t, sender, 80, 60)
+
+	m, _ = press(m, "]", "j", "j", "j", "c", "shift+tab")
+	if m.destination != toPullRequest {
+		t.Fatal("shift+tab did not switch the comment to GitHub")
+	}
+	if footer := ansi.Strip(m.footerView()); !strings.Contains(footer, "comment on GitHub") {
+		t.Errorf("footer %q does not say that the comment goes to GitHub", footer)
+	}
+	if view := ansi.Strip(m.View()); !strings.Contains(view, "╰─ comment (shift+tab to cycle) ─") {
+		t.Errorf("the comment box border does not show the destination and the key:\n%s", view)
+	}
+
+	// An empty comment stays in the composer instead of going to GitHub or the agent.
+	m, _ = press(m, "enter")
+	if m.mode != composing || len(sender.sent) != 0 {
+		t.Error("enter sent an empty GitHub comment")
+	}
+
+	m, _ = press(m, "shift+tab")
+	if m.destination != toAgent {
+		t.Error("shift+tab did not switch the comment back to the agent")
+	}
+}
+
+func TestShiftTabDoesNothingForLocalChanges(t *testing.T) {
+	review := testReview()
+	review.PullRequest = nil
+
+	var model tea.Model = New(source.Local{}, &fakeSender{}, nil, "dark")
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: 60})
+	model, _ = model.Update(loadedMsg{gen: 1, review: review})
+
+	m, _ := press(model.(Model), "]", "j", "j", "j", "c", "shift+tab")
+	if m.destination != toAgent {
+		t.Error("shift+tab switched a local comment to GitHub")
+	}
+}
+
+func TestReviewCommentUsesTheSideOfEachLine(t *testing.T) {
+	snippet := agent.Snippet{Path: "a.go", Lines: []diff.Line{
+		{Kind: diff.Removed, OldLine: 3},
+		{Kind: diff.Added, NewLine: 3},
+		{Kind: diff.Context, OldLine: 4, NewLine: 4},
+	}}
+
+	got := reviewComment(snippet, "Why?")
+	want := github.ReviewComment{
+		Path:  "a.go",
+		Start: github.CommentLine{Number: 3, Side: github.Left},
+		End:   github.CommentLine{Number: 4, Side: github.Right},
+		Body:  "Why?",
+	}
+	if got != want {
+		t.Errorf("reviewComment = %+v, want %+v", got, want)
+	}
+}
+
+func TestPullRequestWithoutAnAgentOnlyCommentsOnGitHub(t *testing.T) {
+	review := testReview()
+
+	var model tea.Model = New(fakeSource{review}, agent.Clipboard{}, nil, "dark")
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: 60})
+	model, _ = model.Update(loadedMsg{gen: 1, review: review})
+
+	m, _ := press(model.(Model), "]", "j", "j", "j", "c", "shift+tab")
+	if m.destination != toPullRequest {
+		t.Error("the comment does not go to GitHub")
+	}
+	if view := ansi.Strip(m.View()); !strings.Contains(view, "╰─ comment ─") {
+		t.Errorf("the comment box border does not say comment without a hint:\n%s", view)
 	}
 }

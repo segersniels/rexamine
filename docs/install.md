@@ -5,7 +5,7 @@
 - macOS or Linux, on arm64 or x64.
 - `git` for local changes.
 - The [GitHub CLI](https://cli.github.com) (`gh`), signed in, for pull requests.
-- [Rex](https://www.superlogical.com/rex) to send comments to an agent pane. Without Rex, comments go to the clipboard.
+- [Rex](https://www.superlogical.com/rex) to send comments to an agent pane. Without Rex, comments on local changes go to the clipboard, and comments on a pull request go to GitHub.
 
 ## Install with the script
 

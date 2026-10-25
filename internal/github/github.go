@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"net/url"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // prFields lists the pull request fields that rexdiff asks gh for.
-const prFields = "number,title,url,state,isDraft,author,updatedAt,baseRefName,headRefName,reviewDecision,labels,body"
+const prFields = "number,title,url,state,isDraft,author,updatedAt,baseRefName,headRefName,headRefOid,reviewDecision,labels,body"
 
 // Author is the GitHub account that wrote something.
 type Author struct {
@@ -37,6 +38,7 @@ type PullRequest struct {
 	UpdatedAt      time.Time
 	BaseRefName    string
 	HeadRefName    string
+	HeadRefOid     string
 	ReviewDecision string
 	Labels         []Label
 	Body           string
@@ -73,6 +75,58 @@ func Fetch(target string) (PullRequest, string, error) {
 // OpenInBrowser opens the pull request on GitHub.
 func OpenInBrowser(url string) error {
 	_, err := run("pr", "view", url, "--web")
+	return err
+}
+
+// Side tells which version of the file a review comment line is in: "LEFT"
+// for the base and "RIGHT" for the head.
+type Side string
+
+// The sides of a diff, as the GitHub API names them.
+const (
+	Left  Side = "LEFT"
+	Right Side = "RIGHT"
+)
+
+// CommentLine is a line of a file in the pull request's diff.
+type CommentLine struct {
+	Number int
+	Side   Side
+}
+
+// ReviewComment is a comment on a range of lines in one file of a pull
+// request. Start and End are the same line for a comment on one line.
+type ReviewComment struct {
+	Path       string
+	Start, End CommentLine
+	Body       string
+}
+
+// PostReviewComment posts the comment on the pull request's head commit. GitHub
+// publishes it at once, outside of a pending review.
+func PostReviewComment(pr PullRequest, comment ReviewComment) error {
+	parsed, err := url.Parse(pr.URL)
+	if err != nil {
+		return fmt.Errorf("read pull request URL: %w", err)
+	}
+
+	args := []string{
+		"api", fmt.Sprintf("repos/%s/pulls/%d/comments", Repository(pr.URL), pr.Number),
+		"--hostname", parsed.Host,
+		"-f", "commit_id=" + pr.HeadRefOid,
+		"-f", "path=" + comment.Path,
+		"-f", "body=" + comment.Body,
+		"-F", "line=" + strconv.Itoa(comment.End.Number),
+		"-f", "side=" + string(comment.End.Side),
+	}
+	if comment.Start != comment.End {
+		args = append(args,
+			"-F", "start_line="+strconv.Itoa(comment.Start.Number),
+			"-f", "start_side="+string(comment.Start.Side),
+		)
+	}
+
+	_, err = run(args...)
 	return err
 }
 

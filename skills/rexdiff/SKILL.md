@@ -15,7 +15,7 @@ rex do -s "$REX_SESSION" -b "$REX_BLOCK" rexdiff pr=<PR URL or number>
 
 - Leave out `pr=` to show the local changes of the current branch. The user can press `t` in the pane to switch to uncommitted changes only, or to the changes of your last turn.
 - Run the command again with `pr=` to show another pull request. Run it without `pr=` to close the pane.
-- If `REX_SESSION` or `REX_BLOCK` is not set, tell the user that the pane only works inside Rex. They can still run `rexdiff` in another terminal, and it copies comments to the clipboard.
+- If `REX_SESSION` or `REX_BLOCK` is not set, tell the user that the pane only works inside Rex. They can still run `rexdiff` in another terminal, and it copies comments on local changes to the clipboard.
 - Do not wait for the pane or read its output. The pane is for the user.
 - If Rex does not know the `rexdiff` action, tell the user to run `rexdiff setup`.
 - If the command fails in another way, Rex may have changed, because Rex is in beta. Run `rex skill show` to read the commands of the installed Rex version. Use them to open rexdiff in a split beside this pane, with `--agent "$REX_BLOCK"` so comments come back here. For example: `rex split -s "$REX_SESSION" -b "$REX_BLOCK" --split=right -- rexdiff --agent "$REX_BLOCK" <PR>`. Then tell the user that rexdiff may need an update.

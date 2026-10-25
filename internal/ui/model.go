@@ -40,6 +40,14 @@ const (
 	composing
 )
 
+// destination tells where the composer sends a comment.
+type destination int
+
+const (
+	toAgent destination = iota
+	toPullRequest
+)
+
 type (
 	loadedMsg struct {
 		gen    int
@@ -52,7 +60,10 @@ type (
 		tree string
 		err  error
 	}
-	sentMsg        struct{ err error }
+	sentMsg struct {
+		err  error
+		done string
+	}
 	openedMsg      struct{ err error }
 	clearStatusMsg struct{ id int }
 )
@@ -112,6 +123,9 @@ type Model struct {
 	mode          mode
 	snippet       agent.Snippet
 
+	// destination stays the same between comments, so a review pass can post several comments in a row.
+	destination destination
+
 	status   string
 	statusID int
 
@@ -124,7 +138,6 @@ type Model struct {
 // is a glamour style name, such as "dark".
 func New(src source.Source, sender agent.Sender, turns <-chan struct{}, markdownStyle string) Model {
 	composer := textarea.New()
-	composer.Placeholder = "Ask a question about these lines…"
 	composer.ShowLineNumbers = false
 	composer.Prompt = ""
 	composer.CharLimit = 0
@@ -140,13 +153,18 @@ func New(src source.Source, sender agent.Sender, turns <-chan struct{}, markdown
 		keys.Toggle.SetHelp("t", "branch/uncommitted/last turn")
 	}
 
-	return Model{
+	// A pull request opened without an agent has nobody to ask, so its comments only go to GitHub.
+	_, toClipboard := sender.(agent.Clipboard)
+	composeKeys := newComposeKeys()
+	composeKeys.Cycle.SetEnabled(!local && !toClipboard)
+
+	m := Model{
 		source:        src,
 		sender:        sender,
 		markdownStyle: markdownStyle,
 		turns:         turns,
 		keys:          keys,
-		composeKeys:   newComposeKeys(sender.Target()),
+		composeKeys:   composeKeys,
 		help:          help.New(),
 		spinner:       spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(accentStyle)),
 		composer:      composer,
@@ -155,6 +173,11 @@ func New(src source.Source, sender agent.Sender, turns <-chan struct{}, markdown
 		loadGen:       1,
 		anchor:        -1,
 	}
+	m.setDestination(toAgent)
+	if !local && toClipboard {
+		m.setDestination(toPullRequest)
+	}
+	return m
 }
 
 // Init starts the first load.
@@ -217,7 +240,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m, m.setStatus(errorStyle.Render(msg.err.Error()))
 		}
-		return m, m.setStatus(statusStyle.Render("✓ Sent to " + m.sender.Target()))
+		return m, m.setStatus(statusStyle.Render("✓ " + msg.done))
 
 	case openedMsg:
 		if msg.err != nil {
@@ -349,6 +372,25 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // updateComposer handles keys while the user writes a comment.
 func (m Model) updateComposer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
+	case key.Matches(msg, m.composeKeys.Cycle):
+		if m.destination == toAgent {
+			m.setDestination(toPullRequest)
+		} else {
+			m.setDestination(toAgent)
+		}
+		return m, nil
+
+	case key.Matches(msg, m.composeKeys.Send) && m.destination == toPullRequest:
+		body := strings.TrimSpace(m.composer.Value())
+
+		// GitHub rejects a comment without text, and the lines alone say nothing to other reviewers.
+		if body == "" {
+			return m, m.setStatus(dimStyle.Render("Write a comment to post it on GitHub."))
+		}
+		comment := reviewComment(m.snippet, body)
+		m.endComment()
+		return m, postComment(*m.review.PullRequest, comment)
+
 	case key.Matches(msg, m.composeKeys.Send):
 		text := agent.Format(m.snippet, m.composer.Value())
 		m.endComment()
@@ -660,6 +702,22 @@ func (m *Model) startComment() tea.Cmd {
 	return m.composer.Focus()
 }
 
+// setDestination chooses where the composer sends comments, and updates the
+// hints that tell the user.
+func (m *Model) setDestination(d destination) {
+	m.destination = d
+	agentTarget := m.sender.Target()
+
+	if d == toPullRequest {
+		m.composer.Placeholder = "Write a review comment for GitHub…"
+		m.composeKeys.Send.SetHelp("enter", "comment on GitHub")
+		return
+	}
+
+	m.composer.Placeholder = "Ask a question about these lines…"
+	m.composeKeys.Send.SetHelp("enter", "send to "+agentTarget)
+}
+
 // endComment closes the composer and clears the selection.
 func (m *Model) endComment() {
 	m.mode = browsing
@@ -835,6 +893,12 @@ func (m Model) composerHeight() int {
 func (m Model) composerBox() []string {
 	width := m.composerWidth()
 
+	// A different color warns that the comment goes to GitHub, where others can read it.
+	color := accentColor
+	if m.destination == toPullRequest {
+		color = mergedColor
+	}
+
 	// On a narrow screen, keep the end of the path, which names the file.
 	label := fmt.Sprintf("%s %s", m.snippet.Path, m.snippet.Location())
 	if room := width - 6; ansi.StringWidth(label) > room {
@@ -845,11 +909,17 @@ func (m Model) composerBox() []string {
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderTop(false).
-		BorderForeground(accentColor).
+		BorderForeground(color).
 		Padding(0, 1).
 		Width(width - 2)
 
-	lines := append([]string{accentStyle.Render(top)}, strings.Split(box.Render(m.composer.View()), "\n")...)
+	borderStyle := lipgloss.NewStyle().Foreground(color)
+	lines := append([]string{borderStyle.Render(top)}, strings.Split(box.Render(m.composer.View()), "\n")...)
+
+	// The hint sits in the bottom border, next to the text, where the user looks while writing.
+	if m.composeKeys.Cycle.Enabled() || m.destination == toPullRequest {
+		lines[len(lines)-1] = m.destinationBorder(width, borderStyle)
+	}
 
 	// The extra space lines the box up with the cursor column of page rows.
 	indent := strings.Repeat(" ", 1+composerIndent)
@@ -857,6 +927,26 @@ func (m Model) composerBox() []string {
 		lines[i] = indent + line
 	}
 	return lines
+}
+
+// destinationBorder draws the bottom border of the comment box with where the
+// comment goes and, when it can change, the key that changes it. A narrow box
+// drops the key.
+func (m Model) destinationBorder(width int, borderStyle lipgloss.Style) string {
+	name := "ask agent"
+	if m.destination == toPullRequest {
+		name = "comment"
+	}
+
+	hint := " (shift+tab to cycle)"
+	room := width - 5
+	if !m.composeKeys.Cycle.Enabled() || ansi.StringWidth(name+hint) > room {
+		hint = ""
+	}
+	name = ansi.Truncate(name, room, "…")
+
+	rest := strings.Repeat("─", max(0, width-ansi.StringWidth(name+hint)-5))
+	return borderStyle.Render("╰─ "+name) + dimStyle.Render(hint) + borderStyle.Render(" "+rest+"╯")
 }
 
 // footerView shows a status message, or the keys for the current mode.
@@ -910,7 +1000,34 @@ func takeSnapshot() tea.Msg {
 
 // send delivers a comment in the background.
 func send(sender agent.Sender, text string) tea.Cmd {
-	return func() tea.Msg { return sentMsg{sender.Send(text)} }
+	return func() tea.Msg { return sentMsg{sender.Send(text), "Sent to " + sender.Target()} }
+}
+
+// postComment posts a review comment on the pull request in the background.
+func postComment(pr github.PullRequest, comment github.ReviewComment) tea.Cmd {
+	return func() tea.Msg {
+		return sentMsg{github.PostReviewComment(pr, comment), fmt.Sprintf("Commented on #%d", pr.Number)}
+	}
+}
+
+// reviewComment turns the snippet into a GitHub review comment from its first
+// to its last line.
+func reviewComment(s agent.Snippet, body string) github.ReviewComment {
+	return github.ReviewComment{
+		Path:  s.Path,
+		Start: commentLine(s.Lines[0]),
+		End:   commentLine(s.Lines[len(s.Lines)-1]),
+		Body:  body,
+	}
+}
+
+// commentLine finds where GitHub shows a diff line. A removed line exists only
+// in the base, so it has the base's line number.
+func commentLine(line diff.Line) github.CommentLine {
+	if line.Kind == diff.Removed {
+		return github.CommentLine{Number: line.OldLine, Side: github.Left}
+	}
+	return github.CommentLine{Number: line.NewLine, Side: github.Right}
 }
 
 // openInBrowser opens a pull request on GitHub in the background.

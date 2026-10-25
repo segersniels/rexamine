@@ -51,12 +51,16 @@ func (k browseKeys) FullHelp() [][]key.Binding {
 
 // composeKeys holds the keys for writing a comment.
 type composeKeys struct {
-	Send, Newline, Cancel key.Binding
+	Send, Cycle, Newline, Cancel key.Binding
 }
 
-func newComposeKeys(target string) composeKeys {
+// newComposeKeys creates the composer keys. The model sets the help of Send,
+// because it depends on where the comment goes. The comment box shows the
+// Cycle key in its border, so the footer leaves it out.
+func newComposeKeys() composeKeys {
 	return composeKeys{
-		Send:    key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "send to "+target)),
+		Send:    key.NewBinding(key.WithKeys("enter")),
+		Cycle:   key.NewBinding(key.WithKeys("shift+tab")),
 		Newline: key.NewBinding(key.WithKeys("alt+enter", "ctrl+j"), key.WithHelp("alt+enter", "new line")),
 		Cancel:  key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
 	}
