@@ -10,6 +10,8 @@ builds:
 
 archives:
   - formats: [tar.gz]
+    # Names without a version let scripts/install.sh download the latest release by a fixed URL.
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md

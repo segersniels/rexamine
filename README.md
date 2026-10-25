@@ -20,7 +20,13 @@ rexdiff is a terminal diff viewer for [Rex](https://www.superlogical.com/rex). I
 
 ## Quickstart
 
-Install rexdiff, then add it to Rex and install the agent skill:
+Install rexdiff, add it to Rex, and install the agent skill with one command:
+
+```sh
+curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/segersniels/rexdiff/main/scripts/install.sh | sh
+```
+
+Or install it with npm, then run the setup yourself:
 
 ```sh
 npm install -g @segersniels/rexdiff
