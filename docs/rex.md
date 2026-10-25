@@ -22,6 +22,24 @@ require("rexdiff").setup{
 
 ## Agent skill
 
-The [`rexdiff` skill](../skills/rexdiff/SKILL.md) teaches an agent to open the pane and to read the comments that rexdiff sends. In Claude Code, ask the agent to open a pull request in rexdiff, or run `/rexdiff <pr>`.
+The [`rexdiff` skill](../skills/rexdiff/SKILL.md) teaches an agent to open the pane and to read the comments that rexdiff sends. Ask the agent to open a pull request in rexdiff. In Claude Code, you can also run `/rexdiff <pr>`.
 
-`rexdiff setup` installs the skill to `~/.claude/skills/rexdiff`. See [Installation and setup](install.md).
+Comments work with every agent without the skill, because rexdiff pastes them into the pane as plain text.
+
+`rexdiff setup` installs the skill for each agent whose configuration directory exists. Agents that share a skills directory get one copy.
+
+| Agent          | Skill directory                                   |
+| -------------- | ------------------------------------------------- |
+| Claude Code    | `~/.claude/skills` (or `$CLAUDE_CONFIG_DIR/skills`) |
+| Codex          | `~/.agents/skills`                                |
+| Pi             | `~/.agents/skills`                                |
+| OpenCode       | `~/.config/opencode/skills`                       |
+| Gemini CLI     | `~/.gemini/skills`                                |
+| GitHub Copilot | `~/.copilot/skills`                               |
+| Cursor         | `~/.cursor/skills`                                |
+| Amp            | `~/.config/agents/skills`                         |
+| Droid          | `~/.factory/skills`                               |
+| Goose          | `~/.config/goose/skills`                          |
+| Crush          | `~/.config/crush/skills`                          |
+
+When you install another agent later, run `rexdiff setup` again. See [Installation and setup](install.md).

@@ -1,5 +1,5 @@
 // Package setup installs the parts of rexdiff that live outside the binary:
-// the Rex module with its key binding, and the agent skill.
+// the Rex module with its key binding, and the skill for each installed agent.
 package setup
 
 import (
@@ -123,23 +123,93 @@ func reloadRex(out io.Writer) {
 	report(out, "Rex", "configuration reloaded")
 }
 
-// installSkill writes the agent skill to Claude Code's skills directory.
+// installSkill writes the agent skill to the skills directory of every
+// installed agent. Agents that share a directory get the skill once.
 func installSkill(skill []byte, out io.Writer) error {
-	dir, err := claudeDir()
+	agents, err := installedAgents()
 	if err != nil {
 		return err
 	}
-
-	path := filepath.Join(dir, "skills", "rexdiff", "SKILL.md")
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(path, skill, 0o644); err != nil {
-		return err
+	if len(agents) == 0 {
+		report(out, "Agent skill", "no supported agent found, skipped")
+		return nil
 	}
 
-	report(out, "Agent skill", path)
+	var dirs []string
+	names := map[string][]string{}
+	for _, a := range agents {
+		if names[a.skillsDir] == nil {
+			dirs = append(dirs, a.skillsDir)
+		}
+		names[a.skillsDir] = append(names[a.skillsDir], a.name)
+	}
+
+	for _, dir := range dirs {
+		path := filepath.Join(dir, "rexdiff", "SKILL.md")
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(path, skill, 0o644); err != nil {
+			return err
+		}
+		report(out, "Agent skill", fmt.Sprintf("%s (%s)", path, strings.Join(names[dir], ", ")))
+	}
 	return nil
+}
+
+// agent is a coding agent that loads skills from a directory.
+type agent struct {
+	name string
+
+	// configDir exists when the agent is installed.
+	configDir string
+	skillsDir string
+}
+
+// installedAgents lists the agents whose configuration directory exists.
+// The directories follow the skills CLI, github.com/vercel-labs/skills.
+func installedAgents() ([]agent, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	config := envOr("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	claude := envOr("CLAUDE_CONFIG_DIR", filepath.Join(home, ".claude"))
+	codex := envOr("CODEX_HOME", filepath.Join(home, ".codex"))
+
+	// Several agents read the shared Agent Skills directory.
+	shared := filepath.Join(home, ".agents", "skills")
+
+	known := []agent{
+		{"Claude Code", claude, filepath.Join(claude, "skills")},
+		{"Codex", codex, shared},
+		{"OpenCode", filepath.Join(config, "opencode"), filepath.Join(config, "opencode", "skills")},
+		{"Gemini CLI", filepath.Join(home, ".gemini"), filepath.Join(home, ".gemini", "skills")},
+		{"GitHub Copilot", filepath.Join(home, ".copilot"), filepath.Join(home, ".copilot", "skills")},
+		{"Cursor", filepath.Join(home, ".cursor"), filepath.Join(home, ".cursor", "skills")},
+		{"Amp", filepath.Join(config, "amp"), filepath.Join(config, "agents", "skills")},
+		{"Pi", filepath.Join(home, ".pi", "agent"), shared},
+		{"Droid", filepath.Join(home, ".factory"), filepath.Join(home, ".factory", "skills")},
+		{"Goose", filepath.Join(config, "goose"), filepath.Join(config, "goose", "skills")},
+		{"Crush", filepath.Join(config, "crush"), filepath.Join(config, "crush", "skills")},
+	}
+
+	var installed []agent
+	for _, a := range known {
+		if info, err := os.Stat(a.configDir); err == nil && info.IsDir() {
+			installed = append(installed, a)
+		}
+	}
+	return installed, nil
+}
+
+// envOr returns the environment variable, or fallback when it is empty.
+func envOr(name, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		return value
+	}
+	return fallback
 }
 
 // rexInitPath finds Rex's configuration file, as Rex does: REX_CONFIG, then
@@ -157,20 +227,6 @@ func rexInitPath() (string, error) {
 		return "", err
 	}
 	return filepath.Join(home, ".config", "rex", "init.lua"), nil
-}
-
-// claudeDir finds Claude Code's configuration directory: CLAUDE_CONFIG_DIR,
-// or ~/.claude.
-func claudeDir() (string, error) {
-	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
-		return dir, nil
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".claude"), nil
 }
 
 // appendFile adds text to the end of a file and creates the file if needed.

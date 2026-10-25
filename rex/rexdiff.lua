@@ -2,7 +2,7 @@
 ---
 --- Adds a "rexdiff" action that opens rexdiff in a pane beside the focused
 --- pane, or closes it when it is already open. Comments written in rexdiff
---- are pasted into the pane it opened beside, such as a Claude Code session.
+--- are pasted into the pane it opened beside, such as a Claude Code or Codex session.
 ---
 --- Usage in ~/.config/rex/init.lua:
 ---

@@ -34,7 +34,7 @@ rexdiff setup
 `rexdiff setup` does three things:
 
 - It writes the Rex module to `~/.config/rex/rexdiff.lua` and loads it from `~/.config/rex/init.lua`, with the full path of the binary and the key `ctrl+alt+cmd+d`.
-- It installs the agent skill to `~/.claude/skills/rexdiff`.
+- It installs the agent skill for each coding agent that it finds. See [Agent skill](rex.md#agent-skill).
 - It reloads the Rex configuration.
 
 | Flag         | Effect                                |

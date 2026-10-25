@@ -48,8 +48,9 @@ Flags:
 const setupUsage = `Usage: rexdiff setup [flags]
 
 Installs the Rex module, loads it from Rex's init.lua with a key that
-toggles the rexdiff pane, and installs the Claude Code skill. Run it again
-after an update to update the module and the skill.
+toggles the rexdiff pane, and installs the agent skill for each coding
+agent that it finds, such as Claude Code and Codex. Run it again after an
+update to update the module and the skill.
 
 Flags:
 `
