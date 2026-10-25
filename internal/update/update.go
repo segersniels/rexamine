@@ -26,7 +26,6 @@ const requestTimeout = 5 * time.Second
 // Notice tells the user about a newer release.
 type Notice struct {
 	Version string
-	Command string
 }
 
 // cache is what the check saves between runs.
@@ -51,7 +50,7 @@ func Check(current string) (Notice, bool) {
 	if err != nil || !newer(latest, current) {
 		return Notice{}, false
 	}
-	return Notice{Version: strings.TrimPrefix(latest, "v"), Command: installCommand()}, true
+	return Notice{Version: strings.TrimPrefix(latest, "v")}, true
 }
 
 // latestVersion reads the latest version from the cache file, or fetches it
@@ -135,8 +134,9 @@ func parse(version string) ([3]int, bool) {
 	return numbers, true
 }
 
-// installCommand gives the command that updates this installation.
-func installCommand() string {
+// Command gives the shell command that updates this installation to the
+// latest release.
+func Command() string {
 	binary, err := os.Executable()
 	if err == nil {
 		binary, err = filepath.EvalSymlinks(binary)

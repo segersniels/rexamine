@@ -38,11 +38,13 @@ var (
 
 const usage = `Usage: rexdiff [flags] [<pr-number> | <pr-url>]
        rexdiff setup [flags]
+       rexdiff update
 
 Shows the changes on the current branch compared to the default branch.
 Give a pull request number or URL to show that pull request instead.
 
 Run "rexdiff setup" once to add rexdiff to Rex and to install the agent skill.
+Run "rexdiff update" to install the latest release.
 
 Flags:
 `
@@ -64,6 +66,9 @@ func main() {
 func run() int {
 	if len(os.Args) > 1 && os.Args[1] == "setup" {
 		return runSetup(os.Args[2:])
+	}
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		return runUpdate()
 	}
 
 	flags := flag.NewFlagSet("rexdiff", flag.ContinueOnError)
@@ -186,6 +191,22 @@ func runSetup(args []string) int {
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "rexdiff setup:", err)
+		return 1
+	}
+	return 0
+}
+
+// runUpdate installs the latest release in the same way as this installation,
+// with npm or with the install script. Both also run `rexdiff setup`, so the
+// Rex module and the agent skill get the update too.
+func runUpdate() int {
+	command := update.Command()
+	fmt.Println("rexdiff: running", command)
+
+	cmd := exec.Command("sh", "-c", command)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintln(os.Stderr, "rexdiff update:", err)
 		return 1
 	}
 	return 0

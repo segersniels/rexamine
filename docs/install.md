@@ -27,7 +27,7 @@ Set a variable for the shell that runs the script:
 curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/segersniels/rexdiff/main/scripts/install.sh | REXDIFF_VERSION=0.2.0 sh
 ```
 
-To update, run the script again.
+To update, run `rexdiff update` or run the script again.
 
 ## Install the binary yourself
 
@@ -68,8 +68,8 @@ rexdiff setup
 
 ## Update
 
-Install the new version in the same way, then run `rexdiff setup` again to update the Rex module and the agent skill. `rexdiff setup` does not change an `init.lua` that already loads rexdiff.
+Run `rexdiff update`. It finds out how you installed rexdiff and installs the latest release in the same way: with npm for an npm install, or with the install script for other installations. Then it runs `rexdiff setup` to update the Rex module and the agent skill. `rexdiff setup` does not change an `init.lua` that already loads rexdiff.
 
-rexdiff checks GitHub for a new release once a day. When one is available, the footer shows it with the update command for your installation: npm for an npm install, or the install script for other installations.
+rexdiff checks GitHub for a new release once a day. When one is available, the footer tells you to run `rexdiff update`.
 
 To change the options of the Rex module, see [Rex module and agent skill](rex.md).

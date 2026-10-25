@@ -877,7 +877,7 @@ func (m Model) footerView() string {
 
 	// The notice wraps instead of being cut, so the update command stays complete in a narrow pane.
 	if m.newRelease != nil {
-		notice := accentStyle.Render("rexdiff "+m.newRelease.Version+" is available:") + " " + dimStyle.Render(m.newRelease.Command)
+		notice := accentStyle.Render("rexdiff "+m.newRelease.Version+" is available:") + " " + dimStyle.Render("`rexdiff update`")
 		lines = append([]string{ansi.Wrap(" "+notice, m.width, "/")}, lines...)
 	}
 	return strings.Join(lines, "\n")

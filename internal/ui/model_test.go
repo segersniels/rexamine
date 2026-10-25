@@ -300,7 +300,7 @@ func TestCollapsedFileStaysCollapsedAfterAReload(t *testing.T) {
 }
 
 func TestUpdateNoticeWrapsInNarrowScreens(t *testing.T) {
-	notice := update.Notice{Version: "9.9.9", Command: "curl -fsSL https://raw.githubusercontent.com/segersniels/rexdiff/main/scripts/install.sh | sh"}
+	notice := update.Notice{Version: "9.9.9"}
 
 	for _, width := range []int{24, 40, 200} {
 		var model tea.Model = newLoadedModel(t, &fakeSender{}, width, 60)
@@ -315,7 +315,7 @@ func TestUpdateNoticeWrapsInNarrowScreens(t *testing.T) {
 				t.Errorf("width %d: line %d is %d columns wide: %q", width, i+1, got, ansi.Strip(line))
 			}
 		}
-		if width == 200 && !strings.Contains(ansi.Strip(view), notice.Command) {
+		if width == 200 && !strings.Contains(ansi.Strip(view), "`rexdiff update`") {
 			t.Errorf("view does not show the whole update command:\n%s", ansi.Strip(view))
 		}
 	}
