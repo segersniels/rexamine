@@ -131,7 +131,7 @@ make snapshot  # build release archives for every platform into dist/
 make help      # list every target
 ```
 
-Push a tag such as `v0.1.0` to release. The release workflow publishes the GitHub release and the npm packages.
+See [CONTRIBUTING.md](CONTRIBUTING.md) to report a problem, open a pull request, or release a version.
 
 ## License
 

@@ -1,0 +1,39 @@
+name: Bug report
+description: Report something in rexdiff that does not work as expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Describe what you saw. Add the exact error message or a screenshot if you have one.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `rexdiff` in a repository with ...
+        2. Press ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: rexdiff version
+      description: The output of `rexdiff --version`.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Your OS, terminal, Rex version, and agent, if they apply.
+      placeholder: macOS 15, Rex 1.2, Claude Code

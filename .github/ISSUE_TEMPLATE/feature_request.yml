@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest a new feature or a change to rexdiff.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe what you are trying to do and what makes it hard now.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe how rexdiff could help. Mockups and examples from other tools are welcome.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Describe other solutions or workarounds that you considered.
