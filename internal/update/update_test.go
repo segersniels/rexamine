@@ -46,7 +46,7 @@ func writeCache(t *testing.T, path string, checkedAt time.Time, latest string) {
 
 func TestLatestVersionUsesAFreshCache(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "update.json")
-	writeCache(t, path, time.Now().Add(-time.Hour), "v0.2.0")
+	writeCache(t, path, time.Now().Add(-checkInterval/2), "v0.2.0")
 
 	fetch := func() (string, error) {
 		t.Error("fetched although the cache is fresh")

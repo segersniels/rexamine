@@ -16,9 +16,10 @@ import (
 // latestReleaseURL is the GitHub API endpoint for the newest release.
 const latestReleaseURL = "https://api.github.com/repos/segersniels/rexdiff/releases/latest"
 
-// checkInterval is how long a check stays valid. GitHub limits requests
-// without a token, and releases are rare, so one check a day is enough.
-const checkInterval = 24 * time.Hour
+// checkInterval is how long a check stays valid. GitHub allows 60 requests an
+// hour without a token, so one check an hour stays far below the limit and
+// still shows a new release soon.
+const checkInterval = time.Hour
 
 // requestTimeout keeps a slow network from holding a check open.
 const requestTimeout = 5 * time.Second
@@ -35,7 +36,7 @@ type cache struct {
 }
 
 // Check finds out whether a release newer than current exists. It asks
-// GitHub at most once a day and keeps the answer in the user's cache
+// GitHub at most once an hour and keeps the answer in the user's cache
 // directory. A development build or a failed check reports no notice.
 func Check(current string) (Notice, bool) {
 	if _, ok := parse(current); !ok {
@@ -72,7 +73,7 @@ func RemoveCache() error {
 }
 
 // latestVersion reads the latest version from the cache file, or fetches it
-// and saves it when the cache is missing or older than a day.
+// and saves it when the cache is missing or older than checkInterval.
 func latestVersion(path string, fetch func() (string, error)) (string, error) {
 	var saved cache
 	if content, err := os.ReadFile(path); err == nil && json.Unmarshal(content, &saved) == nil {
