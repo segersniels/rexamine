@@ -15,7 +15,7 @@ You need:
 - [Go](https://go.dev/dl/) 1.24 or later.
 - `git`.
 - The [GitHub CLI](https://cli.github.com) (`gh`), to test pull request reviews.
-- [Rex](https://www.superlogical.com/rex), to test the pane and sending comments. Without Rex, rexdiff copies comments to the clipboard.
+- [Rex](https://www.superlogical.com/rex), to test the pane and sending comments. Without Rex, rexdiff copies comments on local changes to the clipboard and posts comments on a pull request to GitHub.
 
 Clone your fork and build:
 

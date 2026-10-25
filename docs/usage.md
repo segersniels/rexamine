@@ -3,7 +3,7 @@
 ## What rexdiff shows
 
 - **Your local changes**: everything on the current branch compared to the default branch, only the uncommitted changes, or only what the agent changed in its last turn. Untracked files are included. The view updates as files change.
-- **A GitHub pull request**: the description, reviews, comments, and diff, through the [GitHub CLI](https://cli.github.com).
+- **A GitHub pull request**: the description, review status, labels, and diff, through the [GitHub CLI](https://cli.github.com).
 
 ```sh
 rexdiff                  # the changes on the current branch
@@ -24,6 +24,7 @@ rexdiff https://github.com/owner/repo/pull/123
 | `z`, click a file title  | Collapse or expand the file                               |
 | `v`                      | Select lines                                              |
 | `c`, `enter`             | Comment on the selection or the current line              |
+| `shift+tab`, in the box  | Switch the comment between the agent and GitHub           |
 | Mouse drag over lines    | Select the lines and comment on them                      |
 | Click a line number      | Comment on that line                                      |
 | `t`                      | Switch between branch, uncommitted, and last-turn changes |
@@ -45,9 +46,16 @@ When rexdiff runs in a pane beside an agent in Rex, it follows the status that t
 
 The comment box opens below the selected lines. In it, `enter` sends the comment, `alt+enter` starts a new line, and `esc` cancels. A click elsewhere on the page also cancels.
 
-In a pull request review beside an agent, `shift+tab` switches the comment box between the agent and GitHub. rexdiff keeps the choice for the next comment. A pull request review without an agent, such as `rexdiff 123` in a plain terminal, sends comments only to GitHub. A GitHub comment goes on the selected lines of the pull request at once, as your GitHub account, and the box border changes color to show it.
+Where a comment goes depends on how rexdiff runs. The bottom border of the comment box shows it:
 
-Inside Rex, rexdiff pastes the comment into the agent's pane as a real paste, so the agent waits for you to submit. Outside Rex, rexdiff copies a comment on local changes to the clipboard.
+| How rexdiff runs                         | Local changes   | Pull request                                 |
+| ---------------------------------------- | --------------- | -------------------------------------------- |
+| In a pane beside an agent                | The agent       | The agent or GitHub. `shift+tab` switches.   |
+| Without an agent pane, such as `rexdiff` | The clipboard   | GitHub                                       |
+
+- **The agent**: rexdiff pastes the comment into the agent's pane as a real paste, so the agent waits for you to submit.
+- **GitHub**: rexdiff posts the comment on the selected lines of the pull request at once, as your GitHub account. The box border changes color to show it. rexdiff keeps the choice for the next comment.
+- **The clipboard**: paste the comment into any agent yourself.
 
 A comment arrives in the agent's prompt in this form:
 

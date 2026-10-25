@@ -43,13 +43,13 @@ rexdiff --uncommitted    # only the uncommitted changes
 rexdiff 123              # pull request 123 of the current repository
 ```
 
-Outside Rex, rexdiff copies each comment on local changes to the clipboard, so it works with any agent. In a pull request, comments go to GitHub instead.
+Without an agent pane, rexdiff copies each comment on local changes to the clipboard, so you can paste it into any agent. In a pull request without an agent pane, rexdiff posts each comment on GitHub.
 
 ## Features
 
-- **Local changes and pull requests**: review your branch, only the uncommitted changes, or a GitHub pull request with its description, reviews, and comments.
+- **Local changes and pull requests**: review your branch, only the uncommitted changes, or a GitHub pull request with its description, review status, and labels.
 - **Comments into the prompt**: select lines with `v` or the mouse, and send a comment with the lines to the agent pane as a real paste. The agent waits for you to submit.
-- **Comments on GitHub**: in a pull request, press `shift+tab` in the comment box to post the comment on the pull request instead.
+- **Comments on GitHub**: in a pull request, post a comment on the selected lines. Beside an agent, press `shift+tab` in the comment box to switch between the agent and GitHub.
 - **Live updates**: the view follows your edits, including untracked files.
 - **Last agent turn**: inside Rex, press `t` to see only what the agent changed since it started its last turn.
 - **Made for narrow panes**: text wraps to the pane's width and reflows when you resize it.
