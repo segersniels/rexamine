@@ -1,24 +1,50 @@
 name: Release
 
+# A maintainer starts a release by hand from the Actions tab. Only people with
+# write access to the repository can run it.
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, such as 0.1.0"
+        required: true
+        type: string
 
 permissions:
   contents: write
   # Lets npm publish with trusted publishing, without a token.
   id-token: write
 
+concurrency:
+  group: release
+
 jobs:
   release:
+    # Release only from main, so a release never contains unmerged work.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
     steps:
+      # The npm publish script does not support prerelease versions.
+      - name: Check the version
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Use a version such as 1.2.3, without a v or a prerelease suffix."
+            exit 1
+          fi
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      - run: go test -race ./...
+      # GoReleaser takes the version from the tag on the released commit.
+      - name: Tag the release
+        run: |
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
@@ -29,4 +55,4 @@ jobs:
         with:
           node-version: "24.x"
           registry-url: "https://registry.npmjs.org"
-      - run: node scripts/npm-publish.mjs "${GITHUB_REF_NAME}"
+      - run: node scripts/npm-publish.mjs "v$VERSION"
