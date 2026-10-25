@@ -95,16 +95,23 @@ func installRex(module []byte, opts Options) error {
 	return nil
 }
 
-// setupCall builds the lines that init.lua needs to load rexdiff.
+// setupCall builds the lines that init.lua needs to load rexdiff. A Lua error
+// stops Rex from running the rest of init.lua, so the lines catch an error in
+// the module, for example after a Rex update, and log it instead.
 func setupCall(opts Options) string {
 	var call strings.Builder
-	call.WriteString("-- Added by `rexdiff setup`.\n")
-	call.WriteString(rexRequire + ".setup{\n")
-	call.WriteString("  bin = " + luaString(opts.Binary) + ",\n")
+	call.WriteString("-- Added by `rexdiff setup`. An error in rexdiff does not stop the rest of this file.\n")
+	call.WriteString("do\n")
+	call.WriteString("  local ok, err = pcall(function()\n")
+	call.WriteString("    " + rexRequire + ".setup{\n")
+	call.WriteString("      bin = " + luaString(opts.Binary) + ",\n")
 	if opts.Key != "" {
-		call.WriteString("  key = " + luaString(opts.Key) + ",\n")
+		call.WriteString("      key = " + luaString(opts.Key) + ",\n")
 	}
-	call.WriteString("}\n")
+	call.WriteString("    }\n")
+	call.WriteString("  end)\n")
+	call.WriteString(`  if not ok then rex.log("error", "rexdiff: " .. tostring(err)) end` + "\n")
+	call.WriteString("end\n")
 	return call.String()
 }
 

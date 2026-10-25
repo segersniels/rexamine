@@ -61,7 +61,7 @@ rexdiff uses these parts of Rex:
 If something stops working after a Rex update:
 
 1. **Comments do not reach the agent.** rexdiff copies a comment to the clipboard when the paste fails, and shows the error at the bottom of the pane. Paste the comment into the agent yourself.
-2. **The key or the action does nothing.** Update rexdiff and run `rexdiff setup` again. Then run `rex config reload` and read the errors that it reports.
+2. **The key or the action does nothing.** The lines that `rexdiff setup` adds to `init.lua` catch an error in the rexdiff module, so the rest of your configuration still loads. If `rex do rexdiff` reports that the action does not exist, the module did not load. Update rexdiff and run `rexdiff setup` again.
 3. **The agent cannot open the pane.** The agent skill tells the agent to read `rex skill show`, which describes the commands of the installed Rex version, and to open the pane with them. You can do the same by hand:
 
    ```sh

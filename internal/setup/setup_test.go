@@ -75,7 +75,7 @@ func TestRunInstallsEverything(t *testing.T) {
 	if strings.Count(init, rexRequire) != 1 {
 		t.Errorf("init.lua loads rexdiff %d times, want once:\n%s", strings.Count(init, rexRequire), init)
 	}
-	for _, want := range []string{`bin = "/opt/bin/rexdiff"`, `key = "ctrl+alt+cmd+d"`} {
+	for _, want := range []string{`bin = "/opt/bin/rexdiff"`, `key = "ctrl+alt+cmd+d"`, "pcall(function()"} {
 		if !strings.Contains(init, want) {
 			t.Errorf("init.lua does not contain %s:\n%s", want, init)
 		}
