@@ -28,6 +28,7 @@ Press `p` to switch between the local changes and the pull request of the branch
 | `]` / `[`                | Go to the next or previous file                           |
 | `/`                      | Find a file by part of its path and go to it              |
 | `z`, click a title       | Collapse or expand the file or the description            |
+| `x`                      | Hide or show test files; rexdiff remembers the choice     |
 | `v`                      | Select lines                                              |
 | `c`, `enter`             | Comment on the selection or the current line              |
 | `shift+tab`, in the box  | Switch the comment between the agent and GitHub           |

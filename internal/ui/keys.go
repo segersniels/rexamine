@@ -37,7 +37,6 @@ func newBrowseKeys() browseKeys {
 		Help:     key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit:     key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 
-		// The help lists this key, but the docs leave it out.
 		HideTests: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "hide/show tests")),
 	}
 }
