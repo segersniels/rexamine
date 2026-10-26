@@ -2,7 +2,7 @@
 
 ## Rex module
 
-The Rex module adds a `rexdiff` action. It opens rexdiff in a pane beside the focused pane and sends comments to that pane. Run the action again to close the pane.
+The Rex module adds a `rexdiff` action. It opens rexdiff in a pane beside the focused pane and sends comments to that pane. Run the action again to close the pane. Each tab has its own rexdiff pane, so the action never closes a pane in another tab.
 
 Focus your agent's pane and press the key to review the local changes. To review a pull request, run:
 

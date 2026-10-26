@@ -17,15 +17,21 @@ local M = {}
 --- Labels the rexdiff pane, so the action can find it again.
 local LABEL = "rexdiff"
 
---- Finds the open rexdiff pane in the session, if there is one.
-local function find_pane()
-  local view = rex.session.view{}
+--- Finds the open rexdiff pane in the tab of the anchor pane, or in the shown
+--- tab without an anchor. Each tab keeps its own pane, so that agents in
+--- different tabs do not close each other's pane.
+local function find_pane(session_id, anchor_id)
+  local view = rex.session.view{ session_id = session_id }
   for _, window in ipairs(view.windows or {}) do
+    local pane, has_anchor = nil, false
     for _, layer in ipairs(window.layers or {}) do
       for _, block in ipairs(layer.blocks or {}) do
-        if block.label == LABEL then return block.block_id end
+        if block.label == LABEL then pane = block.block_id end
+        if block.block_id == anchor_id then has_anchor = true end
       end
     end
+
+    if has_anchor or (not anchor_id and window.window_id == view.active_window_id) then return pane end
   end
 end
 
@@ -64,7 +70,7 @@ function M.setup(opts)
     keywords    = "diff review pull request pr",
     args        = { pr = "string?", dir = "string?" },
     run         = function(ctx, args)
-      local open = find_pane()
+      local open = find_pane(ctx.session_id, ctx.block_id)
       if open then rex.call("block.close", { session_id = ctx.session_id, block_id = open }) end
 
       -- Without a pull request or a directory the action toggles, so a second key press only closes the pane.
