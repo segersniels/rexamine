@@ -47,7 +47,7 @@ Without an agent pane, rexdiff copies each comment on local changes to the clipb
 
 ## Features
 
-- **Local changes and pull requests**: review your branch, only the uncommitted changes, or a GitHub pull request with its description, review status, and labels.
+- **Local changes and pull requests**: review your branch, only the uncommitted changes, or a GitHub pull request with its description, review status, and labels. Press `p` to switch between the pull request and your local changes.
 - **Comments into the prompt**: select lines with `v` or the mouse, and send a comment with the lines to the agent pane as a real paste. The agent waits for you to submit.
 - **Comments on GitHub**: in a pull request, post a comment on the selected lines. Beside an agent, press `shift+tab` in the comment box to switch between the agent and GitHub.
 - **Live updates**: the view follows your edits, including untracked files.

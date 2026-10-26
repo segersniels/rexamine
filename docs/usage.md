@@ -12,6 +12,11 @@ rexdiff 123              # pull request 123 of the current repository
 rexdiff https://github.com/owner/repo/pull/123
 ```
 
+Press `p` to switch between the local changes and the pull request of the branch. Each view keeps its own settings, such as the scope of the local changes.
+
+- From a pull request, rexdiff shows the local changes of the worktree that has the pull request's branch checked out. Without such a worktree, it shows the current checkout.
+- After `w` switches to another worktree, `p` shows the pull request of that worktree's branch.
+
 ## Keys
 
 | Key                      | Action                                                    |
