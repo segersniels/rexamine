@@ -131,7 +131,7 @@ func run() int {
 		markdownStyle = "dark"
 	}
 
-	program := tea.NewProgram(ui.New(src, sender, turns, markdownStyle), tea.WithAltScreen(), tea.WithMouseCellMotion())
+	program := tea.NewProgram(ui.New(src, sender, turns, markdownStyle), tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus())
 
 	// The check can wait on the network, so it runs beside the screen and never delays it.
 	go func() {

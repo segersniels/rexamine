@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
@@ -483,6 +484,23 @@ func TestReloadWhileHiddenDoesNotCrashOnReturn(t *testing.T) {
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
 	if view := ansi.Strip(model.(Model).View()); !strings.Contains(view, "x") {
 		t.Errorf("page does not show the new diff:\n%s", view)
+	}
+}
+
+func TestFocusReloadsAPullRequestAfterTheCooldown(t *testing.T) {
+	m := newLoadedModel(t, &fakeSender{}, 80, 40)
+
+	var model tea.Model = m
+	model, cmd := model.Update(tea.FocusMsg{})
+	if cmd != nil {
+		t.Fatal("focus right after the first load starts another load")
+	}
+
+	m = model.(Model)
+	m.loadStarted = time.Now().Add(-focusCooldown)
+	model, cmd = m.Update(tea.FocusMsg{})
+	if cmd == nil || model.(Model).loadGen != 2 {
+		t.Fatal("focus after the cooldown does not reload the pull request")
 	}
 }
 

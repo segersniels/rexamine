@@ -29,6 +29,10 @@ const watchInterval = 2 * time.Second
 // statusDuration is how long a status message stays in the footer.
 const statusDuration = 3 * time.Second
 
+// focusCooldown is the shortest time between two loads that a pull request
+// starts when its pane gets focus.
+const focusCooldown = 30 * time.Second
+
 // composerIndent is how far the comment box is indented under the code.
 const composerIndent = 2
 
@@ -110,6 +114,9 @@ type Model struct {
 	loadGen  int
 	watchGen int
 
+	// loadStarted is when the last load started, so a focus reload can wait for the cooldown.
+	loadStarted time.Time
+
 	width, height int
 	rows          []row
 	fileStarts    []int
@@ -184,6 +191,7 @@ func New(src source.Source, sender agent.Sender, turns <-chan struct{}, markdown
 		collapsed:     map[string]bool{},
 		loading:       true,
 		loadGen:       1,
+		loadStarted:   time.Now(),
 		anchor:        -1,
 	}
 	m.setDestination(toAgent)
@@ -219,6 +227,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case loadedMsg:
 		return m.handleLoaded(msg)
+
+	case tea.FocusMsg:
+		// Local reviews already check for changes on a timer. A pull request reloads only on request or focus.
+		_, local := m.source.(source.Local)
+		if local || time.Since(m.loadStarted) < focusCooldown {
+			return m, nil
+		}
+		return m, m.reload()
 
 	case watchMsg:
 		if msg.gen != m.watchGen {
@@ -550,11 +566,12 @@ func (m Model) dragTarget(y int) int {
 // reload loads the review again. The result replaces any earlier load.
 func (m *Model) reload() tea.Cmd {
 	m.loadGen++
+	m.loadStarted = time.Now()
 	return loadReview(m.source, m.loadGen)
 }
 
 // scheduleWatch plans the next check for local changes. Pull requests change
-// rarely, so they reload only on request.
+// rarely, so they reload only on request or when the pane gets focus.
 func (m *Model) scheduleWatch() tea.Cmd {
 	if _, local := m.source.(source.Local); !local {
 		return nil
