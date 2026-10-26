@@ -50,8 +50,10 @@ func testReview() source.Review {
 		Diff:    testDiff,
 		PullRequest: &github.PullRequest{
 			Number: 7, Title: "Tidy imports", State: "OPEN", Author: github.Author{Login: "someone"},
-			Labels: []github.Label{{Name: "bug", Color: "d73a4a"}, {Name: "a-label-name-that-is-too-long-for-a-narrow-pane", Color: "fbca04"}, {Name: "no-color"}},
-			Body:   "Removes an unused import. See https://example.com/a/very/long/link/that/does/not/fit.",
+			ReviewRequests: []github.ReviewRequest{{Login: "a-reviewer-with-a-login-that-is-too-long-for-a-narrow-pane"}, {Name: "core-team"}},
+			LatestReviews:  []github.Review{{Author: github.Author{Login: "approver"}, State: "APPROVED"}},
+			Labels:         []github.Label{{Name: "bug", Color: "d73a4a"}, {Name: "a-label-name-that-is-too-long-for-a-narrow-pane", Color: "fbca04"}, {Name: "no-color"}},
+			Body:           "Removes an unused import. See https://example.com/a/very/long/link/that/does/not/fit.",
 		},
 	}
 }
@@ -481,5 +483,33 @@ func TestReloadWhileHiddenDoesNotCrashOnReturn(t *testing.T) {
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
 	if view := ansi.Strip(model.(Model).View()); !strings.Contains(view, "x") {
 		t.Errorf("page does not show the new diff:\n%s", view)
+	}
+}
+
+func TestReviewerChipsShowEachReviewerOnce(t *testing.T) {
+	pr := github.PullRequest{
+		Author: github.Author{Login: "author"},
+		ReviewRequests: []github.ReviewRequest{
+			{Login: "approver"},
+			{Login: "waiting"},
+			{Name: "core-team"},
+		},
+		LatestReviews: []github.Review{
+			{Author: github.Author{Login: "approver"}, State: "APPROVED"},
+			{Author: github.Author{Login: "blocker"}, State: "CHANGES_REQUESTED"},
+			{Author: github.Author{Login: "bot"}, State: "COMMENTED"},
+			{Author: github.Author{Login: "author"}, State: "COMMENTED"},
+			{Author: github.Author{Login: "dismissed"}, State: "DISMISSED"},
+		},
+	}
+
+	var got []string
+	for _, chip := range reviewerChips(pr) {
+		got = append(got, ansi.Strip(chip))
+	}
+
+	want := []string{"✓ approver", "✗ blocker", "○ bot", "● waiting", "● core-team"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("reviewerChips() = %q, want %q", got, want)
 	}
 }

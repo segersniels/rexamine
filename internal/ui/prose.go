@@ -31,8 +31,8 @@ func newMarkdownRenderer(width int, markdownStyle string) (*glamour.TermRenderer
 }
 
 // renderHeader renders what the review is, the branches it compares, and
-// its size. A pull request also shows its state, author, review status, and
-// labels.
+// its size. A pull request also shows its state, author, review status,
+// reviewers, and labels.
 func renderHeader(review source.Review, files []diff.File, width int) string {
 	pr := review.PullRequest
 
@@ -68,6 +68,12 @@ func renderHeader(review source.Review, files []diff.File, width int) string {
 
 	for i, line := range lines {
 		lines[i] = ansi.Wrap(line, width, " /")
+	}
+
+	if pr != nil {
+		if chips := reviewerChips(*pr); len(chips) > 0 {
+			lines = append(lines, flow(append([]string{dimStyle.Render("Reviewers")}, chips...), width)...)
+		}
 	}
 
 	if pr != nil && len(pr.Labels) > 0 {
@@ -106,6 +112,45 @@ func reviewBadge(decision string) string {
 	default:
 		return ""
 	}
+}
+
+// reviewerChips renders each reviewer with the state of their latest review,
+// followed by the requested reviewers who have not reviewed yet.
+func reviewerChips(pr github.PullRequest) []string {
+	var chips []string
+	reviewed := map[string]bool{}
+	for _, review := range pr.LatestReviews {
+		login := review.Author.Login
+
+		// The author's replies to review threads count as reviews, but the author does not review.
+		if login == pr.Author.Login {
+			continue
+		}
+
+		switch review.State {
+		case "APPROVED":
+			chips = append(chips, addedStyle.Render("✓ "+login))
+		case "CHANGES_REQUESTED":
+			chips = append(chips, removedStyle.Render("✗ "+login))
+		case "COMMENTED":
+			chips = append(chips, dimStyle.Render("○ "+login))
+		default:
+			continue
+		}
+		reviewed[login] = true
+	}
+
+	for _, request := range pr.ReviewRequests {
+		name := request.Login
+		if name == "" {
+			name = request.Name
+		}
+		if reviewed[name] {
+			continue
+		}
+		chips = append(chips, warningStyle.Render("● ")+name)
+	}
+	return chips
 }
 
 // labelChip renders a label in its GitHub color, with text that stays
