@@ -198,9 +198,6 @@ func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, m
 	finder.Placeholder = "Type part of a path…"
 
 	keys := newBrowseKeys()
-	if turns != nil {
-		keys.Toggle.SetHelp("t", "branch/uncommitted/last turn")
-	}
 
 	// The pull request of the current branch is what gh shows without a target.
 	var other source.Source
