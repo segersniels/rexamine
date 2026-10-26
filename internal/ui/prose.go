@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/styles"
@@ -43,7 +42,7 @@ func renderHeader(review source.Review, files []diff.File, width int) string {
 	lines := []string{context, boldStyle.Render(review.Title)}
 
 	if pr != nil {
-		lines = append(lines, pr.Author.Login+dimStyle.Render(" · updated "+timeAgo(pr.UpdatedAt)))
+		lines = append(lines, pr.Author.Login+dimStyle.Render(" · updated "+source.TimeAgo(pr.UpdatedAt)))
 	}
 	lines = append(lines, accentStyle.Render(review.Base)+dimStyle.Render(" ← "+review.Head))
 
@@ -194,23 +193,6 @@ func flow(items []string, width int) []string {
 		lines = append(lines, line)
 	}
 	return lines
-}
-
-// timeAgo describes how long ago a time was, such as "3h ago".
-func timeAgo(t time.Time) string {
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	case d < 30*24*time.Hour:
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	default:
-		return t.Format("Jan 2, 2006")
-	}
 }
 
 // renderHeading renders a section heading with a rule that fills the width.

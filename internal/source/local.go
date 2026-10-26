@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Scope selects which local changes to show.
@@ -376,4 +377,21 @@ func gitEnv(dir string, env []string, args ...string) (string, error) {
 		return string(out), &gitError{args: args, message: message, err: err}
 	}
 	return string(out), nil
+}
+
+// TimeAgo describes how long ago a time was, such as "3h ago".
+func TimeAgo(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 30*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	default:
+		return t.Format("Jan 2, 2006")
+	}
 }
