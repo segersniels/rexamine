@@ -466,3 +466,20 @@ func TestWorktreePickerWithOneCheckoutStaysClosed(t *testing.T) {
 		t.Errorf("got mode %d and status %q, want a status and no picker", m.mode, m.status)
 	}
 }
+
+func TestReloadWhileHiddenDoesNotCrashOnReturn(t *testing.T) {
+	m := newLoadedModel(t, &fakeSender{}, 80, 40)
+	m, _ = press(m, "]", "j", "j", "j", "j")
+
+	// The pane is hidden and gets a size of zero. Then the diff shrinks to one file.
+	var model tea.Model = m
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 0, Height: 0})
+	review := testReview()
+	review.Diff = "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n"
+	model, _ = model.Update(loadedMsg{gen: 1, review: review})
+
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	if view := ansi.Strip(model.(Model).View()); !strings.Contains(view, "x") {
+		t.Errorf("page does not show the new diff:\n%s", view)
+	}
+}

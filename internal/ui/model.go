@@ -206,6 +206,11 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		// A hidden pane can get a size of zero. It has nothing to draw, so the page keeps its last size and
+		// a reload while it is hidden still lays out rows for the new files.
+		if msg.Width == 0 || msg.Height == 0 {
+			return m, nil
+		}
 		m.width, m.height = msg.Width, msg.Height
 		m.help.Width = msg.Width
 		m.composer.SetWidth(m.composerTextWidth())
