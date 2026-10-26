@@ -32,12 +32,14 @@ const statusDuration = 3 * time.Second
 // composerIndent is how far the comment box is indented under the code.
 const composerIndent = 2
 
-// mode tells whether keys go to the page or to the comment composer.
+// mode tells whether keys go to the page, to the comment composer, or to the
+// worktree picker.
 type mode int
 
 const (
 	browsing mode = iota
 	composing
+	picking
 )
 
 // destination tells where the composer sends a comment.
@@ -64,7 +66,11 @@ type (
 		err  error
 		done string
 	}
-	openedMsg      struct{ err error }
+	openedMsg    struct{ err error }
+	worktreesMsg struct {
+		worktrees []source.Worktree
+		err       error
+	}
 	clearStatusMsg struct{ id int }
 )
 
@@ -87,6 +93,7 @@ type Model struct {
 
 	keys        browseKeys
 	composeKeys composeKeys
+	pickKeys    pickKeys
 	help        help.Model
 	spinner     spinner.Model
 	composer    textarea.Model
@@ -126,6 +133,10 @@ type Model struct {
 	// destination stays the same between comments, so a review pass can post several comments in a row.
 	destination destination
 
+	// worktrees holds the checkouts that the picker shows, and pick is the one under its cursor.
+	worktrees []source.Worktree
+	pick      int
+
 	status   string
 	statusID int
 
@@ -148,6 +159,7 @@ func New(src source.Source, sender agent.Sender, turns <-chan struct{}, markdown
 	_, local := src.(source.Local)
 	keys := newBrowseKeys()
 	keys.Toggle.SetEnabled(local)
+	keys.Worktree.SetEnabled(local)
 	keys.Open.SetEnabled(!local)
 	if turns != nil {
 		keys.Toggle.SetHelp("t", "branch/uncommitted/last turn")
@@ -165,6 +177,7 @@ func New(src source.Source, sender agent.Sender, turns <-chan struct{}, markdown
 		turns:         turns,
 		keys:          keys,
 		composeKeys:   composeKeys,
+		pickKeys:      newPickKeys(),
 		help:          help.New(),
 		spinner:       spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(accentStyle)),
 		composer:      composer,
@@ -209,7 +222,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.reload()
 
 	case turnStartedMsg:
-		return m, tea.Batch(takeSnapshot, waitForTurn(m.turns))
+		return m, tea.Batch(takeSnapshot(m.source.(source.Local).Dir), waitForTurn(m.turns))
 
 	case snapshotMsg:
 		if msg.err != nil {
@@ -248,6 +261,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case worktreesMsg:
+		if msg.err != nil {
+			return m, m.setStatus(errorStyle.Render(msg.err.Error()))
+		}
+
+		// The current checkout is always in the list, so one entry leaves nothing to switch to.
+		if len(msg.worktrees) < 2 {
+			return m, m.setStatus(dimStyle.Render("This repository has no other worktrees."))
+		}
+		m.worktrees, m.pick, m.mode = msg.worktrees, 0, picking
+		return m, nil
+
 	// main sends the notice when its check finds a newer release.
 	case update.Notice:
 		m.newRelease = &msg
@@ -265,12 +290,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		if m.mode == composing {
+		switch m.mode {
+		case composing:
 			return m.updateComposer(msg)
+		case picking:
+			return m.updatePicker(msg)
 		}
 		return m.updateBrowser(msg)
 
 	case tea.MouseMsg:
+		if m.mode == picking {
+			return m, nil
+		}
 		return m, m.handleMouse(msg)
 	}
 
@@ -355,6 +386,8 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.source = local
 		return m, tea.Batch(m.reload(), m.setStatus(dimStyle.Render("Showing "+local.Scope.String()+"…")))
+	case key.Matches(msg, m.keys.Worktree):
+		return m, listWorktrees(m.source.(source.Local).Dir)
 	case key.Matches(msg, m.keys.Reload):
 		return m, tea.Batch(m.reload(), m.setStatus(dimStyle.Render("Reloading…")))
 	case key.Matches(msg, m.keys.Open):
@@ -367,6 +400,44 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// updatePicker handles keys while the user chooses a worktree.
+func (m Model) updatePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.pickKeys.Up):
+		m.pick = max(0, m.pick-1)
+	case key.Matches(msg, m.pickKeys.Down):
+		m.pick = min(len(m.worktrees)-1, m.pick+1)
+	case key.Matches(msg, m.pickKeys.Cancel):
+		m.mode = browsing
+		m.clamp()
+	case key.Matches(msg, m.pickKeys.Switch):
+		return m.switchWorktree(m.worktrees[m.pick])
+	}
+	return m, nil
+}
+
+// switchWorktree shows the local changes of another checkout. The turn
+// snapshots, collapsed files, and cursor belong to the old checkout, so they
+// start over.
+func (m Model) switchWorktree(w source.Worktree) (tea.Model, tea.Cmd) {
+	m.mode = browsing
+	if w.Current {
+		m.clamp()
+		return m, nil
+	}
+
+	local := m.source.(source.Local)
+	local.Dir = w.Path
+	local.TurnStart, local.PreviousTurnStart = "", ""
+	m.source = local
+
+	m.review, m.loadErr, m.files, m.rows, m.fileStarts = nil, nil, nil, nil, nil
+	m.collapsed = map[string]bool{}
+	m.cursor, m.offset, m.anchor = 0, 0, -1
+	m.loading = true
+	return m, tea.Batch(m.reload(), m.spinner.Tick)
 }
 
 // updateComposer handles keys while the user writes a comment.
@@ -794,6 +865,8 @@ func (m Model) View() string {
 	switch {
 	case m.width == 0:
 		return ""
+	case m.mode == picking:
+		return m.pickerView()
 	case m.review == nil && m.loadErr != nil:
 		return ansi.Wrap(errorStyle.Render(m.loadErr.Error()), m.width, "") + "\n\n" + dimStyle.Render("r retry · q quit")
 	case m.review == nil:
@@ -801,6 +874,48 @@ func (m Model) View() string {
 	}
 
 	return strings.Join([]string{m.topBarView(), m.bodyView(), m.footerView()}, "\n")
+}
+
+// pickerView lists the worktrees by branch, with tags for the current
+// checkout, the main checkout, and a detached HEAD.
+func (m Model) pickerView() string {
+	title := ansi.Truncate(" Switch worktree", m.width, "…")
+	bar := barStyle.Render(title + strings.Repeat(" ", max(0, m.width-ansi.StringWidth(title))))
+
+	// The list scrolls only as far as it must to keep the cursor on the screen.
+	height := m.bodyHeight()
+	start := max(0, m.pick-height+1)
+
+	lines := make([]string, height)
+	for y := range lines {
+		i := start + y
+		if i >= len(m.worktrees) {
+			break
+		}
+		w := m.worktrees[i]
+
+		var tags []string
+		if w.Current {
+			tags = append(tags, "current")
+		}
+		if w.Main {
+			tags = append(tags, "main")
+		}
+		if w.Branch == "" {
+			tags = append(tags, "detached")
+		}
+		tag := strings.Join(tags, " · ")
+
+		marker := " "
+		if i == m.pick {
+			marker = accentStyle.Render("▌")
+		}
+		name := ansi.Truncate(w.Name(), max(1, m.contentWidth()-ansi.StringWidth(tag)-3), "…")
+		gap := strings.Repeat(" ", max(1, m.contentWidth()-ansi.StringWidth(name)-ansi.StringWidth(tag)-2))
+		lines[y] = marker + " " + name + gap + dimStyle.Render(tag)
+	}
+
+	return strings.Join([]string{bar, strings.Join(lines, "\n"), m.footerView()}, "\n")
 }
 
 // topBarView shows the file at the top of the screen, or the review's title
@@ -957,6 +1072,8 @@ func (m Model) footerView() string {
 		footer = " " + m.status
 	case m.mode == composing:
 		footer = m.help.View(m.composeKeys)
+	case m.mode == picking:
+		footer = m.help.View(m.pickKeys)
 	}
 
 	// Help cuts its own line short, but not on every width, so cut each line here too.
@@ -992,10 +1109,20 @@ func waitForTurn(turns <-chan struct{}) tea.Cmd {
 	}
 }
 
-// takeSnapshot saves the working tree at the start of the agent's turn.
-func takeSnapshot() tea.Msg {
-	tree, err := source.Snapshot()
-	return snapshotMsg{tree, err}
+// takeSnapshot saves the working tree of dir at the start of the agent's turn.
+func takeSnapshot(dir string) tea.Cmd {
+	return func() tea.Msg {
+		tree, err := source.Snapshot(dir)
+		return snapshotMsg{tree, err}
+	}
+}
+
+// listWorktrees lists the checkouts of the repository in dir in the background.
+func listWorktrees(dir string) tea.Cmd {
+	return func() tea.Msg {
+		worktrees, err := source.Worktrees(dir)
+		return worktreesMsg{worktrees, err}
+	}
 }
 
 // send delivers a comment in the background.

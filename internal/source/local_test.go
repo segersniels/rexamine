@@ -180,7 +180,7 @@ func TestLocalOutsideARepository(t *testing.T) {
 func TestLastTurnShowsOnlyTheChangesSinceTheTurnStarted(t *testing.T) {
 	t.Chdir(newRepo(t))
 
-	start, err := Snapshot()
+	start, err := Snapshot("")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +230,7 @@ func TestLastTurnBeforeTheFirstTurnShowsNoChanges(t *testing.T) {
 func TestLastTurnWithoutEditsKeepsThePreviousTurnInView(t *testing.T) {
 	t.Chdir(newRepo(t))
 
-	previous, err := Snapshot()
+	previous, err := Snapshot("")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func TestLastTurnWithoutEditsKeepsThePreviousTurnInView(t *testing.T) {
 	}
 
 	// The next turn starts and only answers a question, so the working tree stays the same.
-	latest, err := Snapshot()
+	latest, err := Snapshot("")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -28,6 +28,7 @@ rexdiff https://github.com/owner/repo/pull/123
 | Mouse drag over lines    | Select the lines and comment on them                      |
 | Click a line number      | Comment on that line                                      |
 | `t`                      | Switch between branch, uncommitted, and last-turn changes |
+| `w`                      | Show the changes of another worktree, by its branch       |
 | `r`                      | Reload                                                    |
 | `o`                      | Open the pull request on GitHub                           |
 | `?`                      | Show all keys                                             |

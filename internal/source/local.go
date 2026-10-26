@@ -45,9 +45,12 @@ func (s Scope) String() string {
 	}
 }
 
-// Local loads the changes in the git repository of the working directory.
+// Local loads the changes in a git repository.
 type Local struct {
 	Scope Scope
+
+	// Dir is a directory in the repository, or empty for the working directory.
+	Dir string
 
 	// TurnStart is the snapshot of the working tree from when the agent
 	// started its latest turn, or empty before the first turn.
@@ -60,7 +63,7 @@ type Local struct {
 
 // Load runs git and returns the changes in the scope.
 func (l Local) Load() (Review, error) {
-	root, err := git("", "rev-parse", "--show-toplevel")
+	root, err := git(l.Dir, "rev-parse", "--show-toplevel")
 	if err != nil {
 		return Review{}, errors.New("not inside a git repository")
 	}
@@ -163,10 +166,11 @@ func (l Local) loadLastTurn(root, branch string) (Review, error) {
 	return review, nil
 }
 
-// Snapshot saves the working tree of the repository in the working directory,
-// with untracked files, and returns the ID of the saved tree.
-func Snapshot() (string, error) {
-	root, err := git("", "rev-parse", "--show-toplevel")
+// Snapshot saves the working tree of the repository in dir, or in the working
+// directory when dir is empty, with untracked files, and returns the ID of the
+// saved tree.
+func Snapshot(dir string) (string, error) {
+	root, err := git(dir, "rev-parse", "--show-toplevel")
 	if err != nil {
 		return "", errors.New("not inside a git repository")
 	}

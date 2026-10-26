@@ -414,3 +414,55 @@ func TestPullRequestWithoutAnAgentOnlyCommentsOnGitHub(t *testing.T) {
 		t.Errorf("the comment box border does not say comment without a hint:\n%s", view)
 	}
 }
+
+func TestWorktreePickerSwitchesToTheChosenBranch(t *testing.T) {
+	src := source.Local{Dir: "/repo", TurnStart: "old", PreviousTurnStart: "older"}
+	var model tea.Model = New(src, &fakeSender{}, nil, "dark")
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 40, Height: 20})
+	model, _ = model.Update(worktreesMsg{worktrees: []source.Worktree{
+		{Path: "/repo", Branch: "main", Main: true, Current: true},
+		{Path: "/repo-topic", Branch: "feat/a-branch-name-that-does-not-fit-in-the-pane"},
+		{Path: "/repo-detached", Head: "0123456789abcdef"},
+	}})
+
+	m := model.(Model)
+	if m.mode != picking {
+		t.Fatal("picker did not open")
+	}
+
+	// Rows name the branch, not the directory, and the tags say which checkout is which.
+	view := ansi.Strip(m.View())
+	for _, want := range []string{"main", "current · main", "feat/a-branch", "0123456", "detached"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("picker does not show %q:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "/repo-topic") {
+		t.Errorf("picker shows a directory:\n%s", view)
+	}
+	for i, line := range strings.Split(m.View(), "\n") {
+		if got := ansi.StringWidth(line); got > 40 {
+			t.Errorf("line %d is %d columns wide: %q", i+1, got, ansi.Strip(line))
+		}
+	}
+
+	m, cmd := press(m, "j", "enter")
+	local := m.source.(source.Local)
+	if m.mode != browsing || local.Dir != "/repo-topic" || cmd == nil {
+		t.Errorf("got mode %d and dir %q, want the topic checkout to load", m.mode, local.Dir)
+	}
+
+	// The turn snapshots belong to the old checkout.
+	if local.TurnStart != "" || local.PreviousTurnStart != "" {
+		t.Errorf("turn snapshots were kept: %q, %q", local.TurnStart, local.PreviousTurnStart)
+	}
+}
+
+func TestWorktreePickerWithOneCheckoutStaysClosed(t *testing.T) {
+	var model tea.Model = New(source.Local{}, &fakeSender{}, nil, "dark")
+	model, _ = model.Update(worktreesMsg{worktrees: []source.Worktree{{Path: "/repo", Branch: "main", Current: true}}})
+
+	if m := model.(Model); m.mode == picking || !strings.Contains(m.status, "no other worktrees") {
+		t.Errorf("got mode %d and status %q, want a status and no picker", m.mode, m.status)
+	}
+}

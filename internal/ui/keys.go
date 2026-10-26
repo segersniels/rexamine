@@ -7,7 +7,7 @@ type browseKeys struct {
 	Up, Down, HalfUp, HalfDown, PageUp, PageDown key.Binding
 	Top, Bottom, NextFile, PrevFile, Collapse    key.Binding
 	Select, Comment, Clear                       key.Binding
-	Toggle, Open, Reload, Help, Quit             key.Binding
+	Toggle, Worktree, Open, Reload, Help, Quit   key.Binding
 }
 
 func newBrowseKeys() browseKeys {
@@ -27,6 +27,7 @@ func newBrowseKeys() browseKeys {
 		Comment:  key.NewBinding(key.WithKeys("c", "enter"), key.WithHelp("c", "comment")),
 		Clear:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear selection")),
 		Toggle:   key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "branch/uncommitted")),
+		Worktree: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "switch worktree")),
 		Open:     key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open on GitHub")),
 		Reload:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload")),
 		Help:     key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
@@ -36,7 +37,7 @@ func newBrowseKeys() browseKeys {
 
 // ShortHelp lists the keys for the one-line footer.
 func (k browseKeys) ShortHelp() []key.Binding {
-	return []key.Binding{k.Select, k.Comment, k.NextFile, k.Toggle, k.Help, k.Quit}
+	return []key.Binding{k.Select, k.Comment, k.NextFile, k.Toggle, k.Worktree, k.Help, k.Quit}
 }
 
 // FullHelp lists every key, grouped in columns.
@@ -45,7 +46,7 @@ func (k browseKeys) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.HalfUp, k.HalfDown, k.PageUp, k.PageDown},
 		{k.Top, k.Bottom, k.NextFile, k.PrevFile, k.Collapse},
 		{k.Select, k.Comment, k.Clear},
-		{k.Toggle, k.Open, k.Reload, k.Help, k.Quit},
+		{k.Toggle, k.Worktree, k.Open, k.Reload, k.Help, k.Quit},
 	}
 }
 
@@ -73,5 +74,29 @@ func (k composeKeys) ShortHelp() []key.Binding {
 
 // FullHelp lists the composer keys in one column.
 func (k composeKeys) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}
+
+// pickKeys holds the keys for choosing a worktree.
+type pickKeys struct {
+	Up, Down, Switch, Cancel key.Binding
+}
+
+func newPickKeys() pickKeys {
+	return pickKeys{
+		Up:     key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "up")),
+		Down:   key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "down")),
+		Switch: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "switch")),
+		Cancel: key.NewBinding(key.WithKeys("esc", "q", "w"), key.WithHelp("esc", "cancel")),
+	}
+}
+
+// ShortHelp lists the picker keys for the footer.
+func (k pickKeys) ShortHelp() []key.Binding {
+	return []key.Binding{k.Up, k.Down, k.Switch, k.Cancel}
+}
+
+// FullHelp lists the picker keys in one column.
+func (k pickKeys) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
