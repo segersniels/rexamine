@@ -26,6 +26,7 @@ Press `p` to switch between the local changes and the pull request of the branch
 | `f` / `b`, page keys     | Move a page                                               |
 | `g` / `G`                | Go to the top or the end                                  |
 | `]` / `[`                | Go to the next or previous file                           |
+| `/`                      | Find a file by part of its path and go to it              |
 | `z`, click a title       | Collapse or expand the file or the description            |
 | `v`                      | Select lines                                              |
 | `c`, `enter`             | Comment on the selection or the current line              |
