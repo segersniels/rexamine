@@ -22,7 +22,7 @@ func newBrowseKeys() browseKeys {
 		Bottom:   key.NewBinding(key.WithKeys("G", "end"), key.WithHelp("G", "end")),
 		NextFile: key.NewBinding(key.WithKeys("]"), key.WithHelp("]", "next file")),
 		PrevFile: key.NewBinding(key.WithKeys("["), key.WithHelp("[", "previous file")),
-		Collapse: key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "collapse/expand file")),
+		Collapse: key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "collapse/expand")),
 		Select:   key.NewBinding(key.WithKeys("v", "V"), key.WithHelp("v", "select")),
 		Comment:  key.NewBinding(key.WithKeys("c", "enter"), key.WithHelp("c", "comment")),
 		Clear:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear selection")),

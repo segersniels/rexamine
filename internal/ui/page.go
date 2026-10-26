@@ -19,7 +19,13 @@ const (
 	proseRow rowKind = iota
 	fileRow
 	codeRow
+
+	// descriptionRow expands or collapses the pull request description on a click or a key.
+	descriptionRow
 )
+
+// descriptionPreviewLines is how many lines a collapsed description shows.
+const descriptionPreviewLines = 4
 
 // row is one screen line of the page. Code rows point back to the diff line
 // they show, so a selection of rows maps to diff lines. A long diff line wraps
@@ -47,8 +53,8 @@ func (r row) sameLine(other row) bool {
 // layoutPage lays out the review as rows that are at most width wide.
 // fileStarts holds the index of each file's first row. highlights holds the
 // syntax colors of files. collapsed holds the paths of the files that show
-// only their title.
-func layoutPage(review source.Review, files []diff.File, highlights []highlightedFile, width int, markdownStyle string, collapsed map[string]bool) (rows []row, fileStarts []int) {
+// only their title. descriptionExpanded shows the full pull request description.
+func layoutPage(review source.Review, files []diff.File, highlights []highlightedFile, width int, markdownStyle string, collapsed map[string]bool, descriptionExpanded bool) (rows []row, fileStarts []int) {
 	addProse := func(text string) {
 		for _, line := range strings.Split(text, "\n") {
 			rows = append(rows, row{kind: proseRow, text: line, file: -1})
@@ -64,7 +70,7 @@ func layoutPage(review source.Review, files []diff.File, highlights []highlighte
 	addProse(renderHeader(review, files, width))
 	addProse("")
 	if pr := review.PullRequest; pr != nil {
-		addProse(renderMarkdown(markdown, pr.Body, width))
+		rows = append(rows, layoutDescription(renderMarkdown(markdown, pr.Body, width), width, descriptionExpanded)...)
 		addProse("")
 	}
 
@@ -79,6 +85,47 @@ func layoutPage(review source.Review, files []diff.File, highlights []highlighte
 		rows = append(rows, layoutFile(i, file, highlights[i], width, collapsed[file.Path])...)
 	}
 	return rows, fileStarts
+}
+
+// layoutDescription lays out the rendered pull request description under a
+// heading. A collapsed description shows only its first lines, so the files
+// stay near the top of the page.
+func layoutDescription(rendered string, width int, expanded bool) []row {
+	lines := strings.Split(rendered, "\n")
+
+	// A short description shows in full, so it has nothing to expand.
+	if len(lines) <= descriptionPreviewLines+1 {
+		rows := []row{{kind: proseRow, text: renderHeading("Description", width), file: -1}}
+		for _, line := range lines {
+			rows = append(rows, row{kind: proseRow, text: line, file: -1})
+		}
+		return rows
+	}
+
+	chevron := "▾ "
+	if !expanded {
+		chevron = "▸ "
+	}
+	rows := []row{{kind: descriptionRow, text: renderHeading(chevron+"Description", width), file: -1}}
+
+	shown := lines
+	if !expanded {
+		shown = lines[:descriptionPreviewLines]
+
+		// A preview that ends on a blank line looks cut off, so the blank lines go to the hidden part.
+		for len(shown) > 1 && strings.TrimSpace(ansi.Strip(shown[len(shown)-1])) == "" {
+			shown = shown[:len(shown)-1]
+		}
+	}
+	for _, line := range shown {
+		rows = append(rows, row{kind: proseRow, text: line, file: -1})
+	}
+	if expanded {
+		return rows
+	}
+
+	more := fmt.Sprintf("… %d more lines", len(lines)-len(shown))
+	return append(rows, row{kind: descriptionRow, text: dimStyle.Render(ansi.Truncate(more, width, "…")), file: -1})
 }
 
 // layoutFile lays out one file's title, hunk headers, and lines. A collapsed

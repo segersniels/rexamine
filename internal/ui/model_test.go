@@ -306,6 +306,70 @@ func TestCollapsedFileStaysCollapsedAfterAReload(t *testing.T) {
 	}
 }
 
+// newLongDescriptionModel creates a loaded model whose pull request has a
+// description that is too long to show in full.
+func newLongDescriptionModel(t *testing.T) Model {
+	t.Helper()
+	review := testReview()
+	review.PullRequest.Body = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.\n\nThe last paragraph."
+
+	var model tea.Model = New(fakeSource{review}, &fakeSender{}, nil, "dark")
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 60, Height: 60})
+	model, _ = model.Update(loadedMsg{gen: 1, review: review})
+	return model.(Model)
+}
+
+// pageText joins the text of every page row without colors.
+func pageText(m Model) string {
+	var lines []string
+	for _, r := range m.rows {
+		lines = append(lines, ansi.Strip(r.text))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func TestLongDescriptionStartsCollapsedAndExpandsWithTheKey(t *testing.T) {
+	m := newLongDescriptionModel(t)
+	if text := pageText(m); strings.Contains(text, "The last paragraph.") || !strings.Contains(text, "more lines") {
+		t.Fatalf("description is not collapsed:\n%s", text)
+	}
+
+	for m.rows[m.cursor].kind != descriptionRow {
+		m, _ = press(m, "j")
+	}
+	m, _ = press(m, "z")
+	if text := pageText(m); !strings.Contains(text, "The last paragraph.") || strings.Contains(text, "more lines") {
+		t.Fatalf("z on the heading did not expand the description:\n%s", text)
+	}
+	if r := m.rows[m.cursor]; r.kind != descriptionRow {
+		t.Errorf("cursor is on %q, want the description heading", ansi.Strip(r.text))
+	}
+
+	m, _ = press(m, "z")
+	if strings.Contains(pageText(m), "The last paragraph.") {
+		t.Error("z on the heading did not collapse the description")
+	}
+}
+
+func TestClickOnMoreLinesExpandsTheDescription(t *testing.T) {
+	m := newLongDescriptionModel(t)
+
+	y := screenY(t, m, "more lines")
+	m = mouse(m, tea.MouseActionPress, 5, y)
+	m = mouse(m, tea.MouseActionRelease, 5, y)
+
+	if !strings.Contains(pageText(m), "The last paragraph.") {
+		t.Error("a click on the more lines row did not expand the description")
+	}
+}
+
+func TestShortDescriptionShowsInFull(t *testing.T) {
+	m := newLoadedModel(t, &fakeSender{}, 60, 60)
+	if text := pageText(m); !strings.Contains(text, "Removes an unused import.") || strings.Contains(text, "more lines") {
+		t.Errorf("short description is not shown in full:\n%s", text)
+	}
+}
+
 func TestUpdateNoticeWrapsInNarrowScreens(t *testing.T) {
 	notice := update.Notice{Version: "9.9.9"}
 

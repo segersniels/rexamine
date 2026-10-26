@@ -21,7 +21,7 @@ rexdiff https://github.com/owner/repo/pull/123
 | `f` / `b`, page keys     | Move a page                                               |
 | `g` / `G`                | Go to the top or the end                                  |
 | `]` / `[`                | Go to the next or previous file                           |
-| `z`, click a file title  | Collapse or expand the file                               |
+| `z`, click a title       | Collapse or expand the file or the description            |
 | `v`                      | Select lines                                              |
 | `c`, `enter`             | Comment on the selection or the current line              |
 | `shift+tab`, in the box  | Switch the comment between the agent and GitHub           |

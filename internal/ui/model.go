@@ -125,6 +125,10 @@ type Model struct {
 	// across reloads, so a file stays collapsed when the diff changes.
 	collapsed map[string]bool
 
+	// descriptionExpanded shows the full pull request description. It starts
+	// collapsed, so the diff is the first thing on the page.
+	descriptionExpanded bool
+
 	offset int
 	cursor int
 
@@ -390,7 +394,11 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.PrevFile):
 		m.jumpToFile(-1)
 	case key.Matches(msg, m.keys.Collapse):
-		m.toggleFile(m.cursor)
+		if m.cursor < len(m.rows) && m.rows[m.cursor].kind == descriptionRow {
+			m.toggleDescription()
+		} else {
+			m.toggleFile(m.cursor)
+		}
 	case key.Matches(msg, m.keys.Select):
 		return m, m.toggleSelection()
 	case key.Matches(msg, m.keys.Clear):
@@ -519,6 +527,12 @@ func (m *Model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 			m.endComment()
 		}
 
+		// A click on the description heading or its "more lines" row expands or collapses the description.
+		if m.rows[i].kind == descriptionRow {
+			m.toggleDescription()
+			return nil
+		}
+
 		// A click on a file title collapses or expands the file.
 		if r := m.rows[i]; r.kind == fileRow && r.hunk == -1 {
 			m.toggleFile(i)
@@ -599,7 +613,7 @@ func (m *Model) layout(files []diff.File) {
 	}
 
 	m.files = files
-	m.rows, m.fileStarts = layoutPage(*m.review, files, m.highlights, m.contentWidth(), m.markdownStyle, m.collapsed)
+	m.rows, m.fileStarts = layoutPage(*m.review, files, m.highlights, m.contentWidth(), m.markdownStyle, m.collapsed, m.descriptionExpanded)
 
 	m.cursor = int(progress * float64(len(m.rows)))
 	if i, ok := m.findLine(cursorKey); cursorOnLine && ok {
@@ -723,6 +737,25 @@ func (m *Model) toggleFile(i int) {
 	offset := m.offset
 	m.layout(m.files)
 	m.cursor, m.offset = m.fileStarts[file], offset
+	m.clamp()
+}
+
+// toggleDescription expands or collapses the pull request description, and
+// moves the cursor to the description heading so it stays on a visible row.
+func (m *Model) toggleDescription() {
+	m.descriptionExpanded = !m.descriptionExpanded
+	m.anchor = -1
+
+	// The rows above the heading do not change, so the heading keeps its row and the screen does not jump.
+	offset := m.offset
+	m.layout(m.files)
+	for i, r := range m.rows {
+		if r.kind == descriptionRow {
+			m.cursor = i
+			break
+		}
+	}
+	m.offset = offset
 	m.clamp()
 }
 
