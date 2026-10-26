@@ -14,7 +14,7 @@ import (
 )
 
 // prFields lists the pull request fields that rexdiff asks gh for.
-const prFields = "number,title,url,state,isDraft,author,updatedAt,baseRefName,headRefName,headRefOid,reviewDecision,reviewRequests,latestReviews,labels,body"
+const prFields = "number,title,url,state,isDraft,author,updatedAt,baseRefName,headRefName,headRefOid,reviewDecision,reviewRequests,reviews,labels,body"
 
 // Author is the GitHub account that wrote something.
 type Author struct {
@@ -34,7 +34,7 @@ type ReviewRequest struct {
 	Name  string
 }
 
-// Review is the latest review of one reviewer. State is APPROVED,
+// Review is one review on the pull request. State is APPROVED,
 // CHANGES_REQUESTED, COMMENTED, DISMISSED, or PENDING.
 type Review struct {
 	Author Author
@@ -55,7 +55,7 @@ type PullRequest struct {
 	HeadRefOid     string
 	ReviewDecision string
 	ReviewRequests []ReviewRequest
-	LatestReviews  []Review
+	Reviews        []Review
 	Labels         []Label
 	Body           string
 }

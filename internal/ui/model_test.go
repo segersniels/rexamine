@@ -52,7 +52,7 @@ func testReview() source.Review {
 		PullRequest: &github.PullRequest{
 			Number: 7, Title: "Tidy imports", State: "OPEN", Author: github.Author{Login: "someone"},
 			ReviewRequests: []github.ReviewRequest{{Login: "a-reviewer-with-a-login-that-is-too-long-for-a-narrow-pane"}, {Name: "core-team"}},
-			LatestReviews:  []github.Review{{Author: github.Author{Login: "approver"}, State: "APPROVED"}},
+			Reviews:        []github.Review{{Author: github.Author{Login: "approver"}, State: "APPROVED"}},
 			Labels:         []github.Label{{Name: "bug", Color: "d73a4a"}, {Name: "a-label-name-that-is-too-long-for-a-narrow-pane", Color: "fbca04"}, {Name: "no-color"}},
 			Body:           "Removes an unused import. See https://example.com/a/very/long/link/that/does/not/fit.",
 		},
@@ -606,9 +606,11 @@ func TestReviewerChipsShowEachReviewerOnce(t *testing.T) {
 			{Login: "waiting"},
 			{Name: "core-team"},
 		},
-		LatestReviews: []github.Review{
+		Reviews: []github.Review{
 			{Author: github.Author{Login: "approver"}, State: "APPROVED"},
+			{Author: github.Author{Login: "blocker"}, State: "COMMENTED"},
 			{Author: github.Author{Login: "blocker"}, State: "CHANGES_REQUESTED"},
+			{Author: github.Author{Login: "approver"}, State: "COMMENTED"},
 			{Author: github.Author{Login: "bot"}, State: "COMMENTED"},
 			{Author: github.Author{Login: "author"}, State: "COMMENTED"},
 			{Author: github.Author{Login: "dismissed"}, State: "DISMISSED"},
