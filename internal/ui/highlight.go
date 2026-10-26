@@ -25,19 +25,42 @@ type highlightedFile [][][]span
 // highlightFiles colors the lines of files for the language that each file
 // name implies. markdownStyle picks light or dark colors.
 func highlightFiles(files []diff.File, markdownStyle string) []highlightedFile {
-	style := codeStyle(markdownStyle)
-
 	result := make([]highlightedFile, len(files))
 	for i, file := range files {
-		lexer := lexers.Match(file.Path)
+		colorSource := fileColorer(file.Path, markdownStyle)
 		for _, hunk := range file.Hunks {
-			result[i] = append(result[i], highlightHunk(lexer, style, hunk))
+			result[i] = append(result[i], highlightHunk(colorSource, hunk))
 		}
 	}
 	return result
 }
 
-// codeStyle picks the syntax colors that match the markdown style. Both follow
+// sourceColorer colors the lines of a source text that ends with a newline,
+// and returns the spans of each line.
+type sourceColorer func(source string) [][]span
+
+// fileColorer picks how to color a file. A tree-sitter grammar parses the
+// code, so it can tell function names, types, and properties apart. Chroma
+// covers the languages that rexdiff has no grammar for. The result is nil
+// when neither knows the language.
+func fileColorer(path, markdownStyle string) sourceColorer {
+	if highlighter := treeSitterHighlighter(path); highlighter != nil {
+		palette := syntaxPaletteFor(markdownStyle)
+		return func(source string) [][]span {
+			return treeSitterSpans(highlighter, palette, source)
+		}
+	}
+
+	if lexer := lexers.Match(path); lexer != nil {
+		style := codeStyle(markdownStyle)
+		return func(source string) [][]span {
+			return chromaSpans(lexer, style, source)
+		}
+	}
+	return nil
+}
+
+// codeStyle picks the Chroma colors that match the markdown style. Both follow
 // GitHub, like the diff colors.
 func codeStyle(markdownStyle string) *chroma.Style {
 	if markdownStyle == "light" {
@@ -48,8 +71,9 @@ func codeStyle(markdownStyle string) *chroma.Style {
 
 // highlightHunk colors each line of a hunk. It highlights the old and the new
 // side of the hunk as separate texts, so comments and strings that span
-// several lines get the correct colors. A nil lexer leaves the lines plain.
-func highlightHunk(lexer chroma.Lexer, style *chroma.Style, hunk diff.Hunk) [][]span {
+// several lines get the correct colors. A nil colorSource leaves the lines
+// plain.
+func highlightHunk(colorSource sourceColorer, hunk diff.Hunk) [][]span {
 	var oldLines, newLines []string
 	for _, line := range hunk.Lines {
 		if line.Kind != diff.Added {
@@ -59,8 +83,8 @@ func highlightHunk(lexer chroma.Lexer, style *chroma.Style, hunk diff.Hunk) [][]
 			newLines = append(newLines, line.Text)
 		}
 	}
-	oldSpans := highlightLines(lexer, style, oldLines)
-	newSpans := highlightLines(lexer, style, newLines)
+	oldSpans := highlightLines(colorSource, oldLines)
+	newSpans := highlightLines(colorSource, newLines)
 
 	result := make([][]span, len(hunk.Lines))
 	oldIndex, newIndex := 0, 0
@@ -84,29 +108,37 @@ func highlightHunk(lexer chroma.Lexer, style *chroma.Style, hunk diff.Hunk) [][]
 // highlightLines colors consecutive lines of one file. It colors the lines as
 // displayText shows them, so the spans make up the same text as the rest of
 // the diff view.
-func highlightLines(lexer chroma.Lexer, style *chroma.Style, lines []string) [][]span {
+func highlightLines(colorSource sourceColorer, lines []string) [][]span {
 	shown := make([]string, len(lines))
 	result := make([][]span, len(lines))
 	for i, line := range lines {
 		shown[i] = displayText(line)
 		result[i] = []span{{text: shown[i]}}
 	}
-	if lexer == nil || len(lines) == 0 {
+	if colorSource == nil || len(lines) == 0 {
 		return result
 	}
 
-	iterator, err := chroma.Coalesce(lexer).Tokenise(nil, strings.Join(shown, "\n")+"\n")
+	for i, spans := range colorSource(strings.Join(shown, "\n") + "\n") {
+		if i >= len(lines) {
+			break
+		}
+		result[i] = spans
+	}
+	return result
+}
+
+// chromaSpans colors source with a Chroma lexer.
+func chromaSpans(lexer chroma.Lexer, style *chroma.Style, source string) [][]span {
+	iterator, err := chroma.Coalesce(lexer).Tokenise(nil, source)
 	if err != nil {
-		return result
+		return nil
 	}
 
 	// The style's base text color is left out, so plain code uses the terminal's own color.
 	baseColor := style.Get(chroma.Background).Colour
-	for i, tokens := range chroma.SplitTokensIntoLines(iterator.Tokens()) {
-		if i >= len(lines) {
-			break
-		}
-
+	var result [][]span
+	for _, tokens := range chroma.SplitTokensIntoLines(iterator.Tokens()) {
 		var spans []span
 		for _, token := range tokens {
 			text := strings.TrimSuffix(token.Value, "\n")
@@ -120,7 +152,7 @@ func highlightLines(lexer chroma.Lexer, style *chroma.Style, lines []string) [][
 			}
 			spans = append(spans, span{text: text, color: color})
 		}
-		result[i] = spans
+		result = append(result, spans)
 	}
 	return result
 }

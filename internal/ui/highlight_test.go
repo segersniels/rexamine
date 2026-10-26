@@ -1,9 +1,9 @@
 package ui
 
 import (
+	"os"
+	"regexp"
 	"testing"
-
-	"github.com/alecthomas/chroma/v2/lexers"
 
 	"github.com/segersniels/rexdiff/internal/diff"
 )
@@ -16,7 +16,7 @@ func TestHighlightHunkKeepsCommentStateAcrossLines(t *testing.T) {
 		{Kind: diff.Added, Text: "x := 1"},
 	}}
 
-	lines := highlightHunk(lexers.Match("main.go"), codeStyle("dark"), hunk)
+	lines := highlightHunk(fileColorer("main.go", "dark"), hunk)
 	commentColor := lines[0][0].color
 	if commentColor == "" {
 		t.Fatal("comment line has no color")
@@ -32,7 +32,7 @@ func TestHighlightHunkKeepsCommentStateAcrossLines(t *testing.T) {
 }
 
 func TestHighlightLinesLeavesUnknownFilesPlain(t *testing.T) {
-	lines := highlightLines(lexers.Match("notes.unknownext"), codeStyle("dark"), []string{"\tsome text"})
+	lines := highlightLines(fileColorer("notes.unknownext", "dark"), []string{"\tsome text"})
 	if len(lines[0]) != 1 || lines[0][0] != (span{text: "    some text"}) {
 		t.Errorf("got %+v, want one plain span with expanded tabs", lines[0])
 	}
@@ -42,7 +42,7 @@ func TestHighlightLinesShowsControlCharactersAsSymbols(t *testing.T) {
 	lines := []string{"s := \"x\ry\"", "b := 2\r", "c := \"\x1b[31m\""}
 	want := []string{"s := \"x␍y\"", "b := 2", "c := \"␛[31m\""}
 
-	got := highlightLines(lexers.Match("main.go"), codeStyle("dark"), lines)
+	got := highlightLines(fileColorer("main.go", "dark"), lines)
 	for i, spans := range got {
 		text := ""
 		for _, s := range spans {
@@ -61,5 +61,62 @@ func TestSpansInCutsAcrossSpans(t *testing.T) {
 	want := []span{{text: "c", color: "#111111"}, {text: "de", color: "#222222"}}
 	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
 		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestHighlightLinesColorsFunctionNames(t *testing.T) {
+	lines := []string{"export async function getAccountAccess(id: string) {", "  await db.batch(id);", "}"}
+
+	got := highlightLines(fileColorer("access.ts", "dark"), lines)
+	for _, name := range []string{"getAccountAccess", "batch"} {
+		if color := spanColor(got, name); color != darkPalette.function {
+			t.Errorf("%s has color %q, want the function color %q", name, color, darkPalette.function)
+		}
+	}
+}
+
+func TestHighlightLinesColorsJSXTags(t *testing.T) {
+	for _, path := range []string{"inbox.tsx", "inbox.jsx"} {
+		got := highlightLines(fileColorer(path, "dark"), []string{`return <div className="list">{name}</div>;`})
+		if color := spanColor(got, "div"); color != darkPalette.tag {
+			t.Errorf("%s: div has color %q, want the tag color %q", path, color, darkPalette.tag)
+		}
+		if color := spanColor(got, "className"); color != darkPalette.function {
+			t.Errorf("%s: className has color %q, want the attribute color %q", path, color, darkPalette.function)
+		}
+	}
+}
+
+func TestHighlightLinesFallsBackToChroma(t *testing.T) {
+	got := highlightLines(fileColorer("build.bat", "dark"), []string{"REM build the app"})
+	if spanColor(got, "REM build the app") == "" {
+		t.Error("a language without a tree-sitter grammar has no colors")
+	}
+}
+
+// spanColor returns the color of the span with exactly the given text.
+func spanColor(lines [][]span, text string) string {
+	for _, spans := range lines {
+		for _, s := range spans {
+			if s.text == text {
+				return s.color
+			}
+		}
+	}
+	return ""
+}
+
+func TestReleaseBuildsEmbedEveryTreeSitterLanguage(t *testing.T) {
+	for _, file := range []string{"../../Makefile", "../../.goreleaser.yaml"} {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for language := range treeSitterLanguages {
+			tag := regexp.MustCompile(`\bgrammar_subset_` + language + `\b`)
+			if !tag.Match(data) {
+				t.Errorf("%s does not embed the %s grammar", file, language)
+			}
+		}
 	}
 }
