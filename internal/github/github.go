@@ -62,8 +62,9 @@ type PullRequest struct {
 
 // Fetch gets a pull request and its unified diff. The target is a number,
 // URL, or branch, as gh accepts it. An empty target selects the pull request
-// of the current branch.
-func Fetch(target string) (PullRequest, string, error) {
+// of the branch that is checked out in dir. An empty dir is the working
+// directory.
+func Fetch(target, dir string) (PullRequest, string, error) {
 	type diffResult struct {
 		diff string
 		err  error
@@ -71,12 +72,12 @@ func Fetch(target string) (PullRequest, string, error) {
 
 	diffs := make(chan diffResult, 1)
 	go func() {
-		out, err := run(withTarget([]string{"pr", "diff", "--color=never"}, target)...)
+		out, err := run(dir, withTarget([]string{"pr", "diff", "--color=never"}, target)...)
 		diffs <- diffResult{string(out), err}
 	}()
 
 	var pr PullRequest
-	out, err := run(withTarget([]string{"pr", "view", "--json", prFields}, target)...)
+	out, err := run(dir, withTarget([]string{"pr", "view", "--json", prFields}, target)...)
 	if err != nil {
 		return pr, "", err
 	}
@@ -90,7 +91,7 @@ func Fetch(target string) (PullRequest, string, error) {
 
 // OpenInBrowser opens the pull request on GitHub.
 func OpenInBrowser(url string) error {
-	_, err := run("pr", "view", url, "--web")
+	_, err := run("", "pr", "view", url, "--web")
 	return err
 }
 
@@ -142,7 +143,7 @@ func PostReviewComment(pr PullRequest, comment ReviewComment) error {
 		)
 	}
 
-	_, err = run(args...)
+	_, err = run("", args...)
 	return err
 }
 
@@ -169,10 +170,12 @@ func withTarget(args []string, target string) []string {
 	return append(args, target)
 }
 
-// run runs gh and turns a failure into an error that holds gh's own message.
-func run(args ...string) ([]byte, error) {
+// run runs gh in dir and turns a failure into an error that holds gh's own
+// message. An empty dir is the working directory.
+func run(dir string, args ...string) ([]byte, error) {
 	var stderr bytes.Buffer
 	cmd := exec.Command("gh", args...)
+	cmd.Dir = dir
 	cmd.Stderr = &stderr
 
 	out, err := cmd.Output()

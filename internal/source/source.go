@@ -33,13 +33,17 @@ type Source interface {
 
 // PullRequest loads a GitHub pull request through gh.
 type PullRequest struct {
-	// Target is a pull request number or URL, as gh accepts it.
+	// Target is a pull request number or URL, as gh accepts it. An empty
+	// target selects the pull request of the branch that is checked out in Dir.
 	Target string
+
+	// Dir is a directory in the repository, or empty for the working directory.
+	Dir string
 }
 
 // Load fetches the pull request and its diff.
 func (p PullRequest) Load() (Review, error) {
-	pr, diff, err := github.Fetch(p.Target)
+	pr, diff, err := github.Fetch(p.Target, p.Dir)
 	if err != nil {
 		return Review{}, err
 	}

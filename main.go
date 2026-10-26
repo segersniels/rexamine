@@ -119,10 +119,9 @@ func run() int {
 		pane := agent.RexPane{Session: os.Getenv("REX_SESSION"), Block: *agentPane}
 		sender = pane
 
-		// Only local changes can show the agent's last turn. Without Rex events, the other views still work.
-		if _, local := src.(source.Local); local {
-			turns, _ = pane.WatchTurns(ctx)
-		}
+		// A pull request also watches, because it can switch to the local changes. Without Rex events, the
+		// other views still work.
+		turns, _ = pane.WatchTurns(ctx)
 	}
 
 	// Ask for the background color before Bubble Tea takes over the terminal.

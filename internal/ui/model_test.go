@@ -523,6 +523,12 @@ func TestWorktreePickerSwitchesToTheChosenBranch(t *testing.T) {
 	if local.TurnStart != "" || local.PreviousTurnStart != "" {
 		t.Errorf("turn snapshots were kept: %q, %q", local.TurnStart, local.PreviousTurnStart)
 	}
+
+	// The pull request follows the checkout, so it is the one of the topic branch.
+	m, _ = press(m, "p")
+	if pr, ok := m.source.(source.PullRequest); !ok || pr.Dir != "/repo-topic" || pr.Target != "" {
+		t.Errorf("got source %#v, want the pull request of the topic checkout", m.source)
+	}
 }
 
 func TestWorktreePickerWithOneCheckoutStaysClosed(t *testing.T) {
@@ -593,5 +599,74 @@ func TestReviewerChipsShowEachReviewerOnce(t *testing.T) {
 	want := []string{"✓ approver", "✗ blocker", "○ bot", "● waiting", "● core-team"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("reviewerChips() = %q, want %q", got, want)
+	}
+}
+
+func TestSwitchKeyMovesBetweenThePullRequestAndTheLocalChanges(t *testing.T) {
+	var model tea.Model = New(source.PullRequest{Target: "12"}, &fakeSender{}, make(chan struct{}), "dark")
+
+	m, cmd := press(model.(Model), "p")
+	local, ok := m.source.(source.Local)
+	if !ok || cmd == nil || !m.loading {
+		t.Fatalf("got source %T, want the local changes to load", m.source)
+	}
+	if !m.keys.Toggle.Enabled() || m.keys.Open.Enabled() || m.composeKeys.Cycle.Enabled() {
+		t.Error("the keys still belong to the pull request")
+	}
+
+	// A turn that starts while the pull request shows still saves its snapshot for the local changes.
+	local.Scope = source.Uncommitted
+	m.source = local
+	m, _ = press(m, "p")
+	model, _ = m.Update(snapshotMsg{tree: "turn"})
+	m = model.(Model)
+	if pr, ok := m.source.(source.PullRequest); !ok || pr.Target != "12" {
+		t.Fatalf("got source %#v, want pull request 12", m.source)
+	}
+
+	m, _ = press(m, "p")
+	local = m.source.(source.Local)
+	if local.Scope != source.Uncommitted || local.TurnStart != "turn" {
+		t.Errorf("got scope %v and turn start %q, want the local settings kept", local.Scope, local.TurnStart)
+	}
+}
+
+func TestSwitchKeyShowsThePullRequestOfTheBranch(t *testing.T) {
+	m, _ := press(New(source.Local{}, &fakeSender{}, nil, "dark"), "p")
+	if pr, ok := m.source.(source.PullRequest); !ok || pr.Target != "" {
+		t.Errorf("got source %#v, want the pull request of the current branch", m.source)
+	}
+	if !m.keys.Open.Enabled() || m.keys.Toggle.Enabled() {
+		t.Error("the keys still belong to the local changes")
+	}
+}
+
+func TestSwitchToLocalChangesFindsTheWorktreeOfThePullRequest(t *testing.T) {
+	var model tea.Model = New(source.PullRequest{Target: "12"}, &fakeSender{}, nil, "dark")
+	model, _ = model.Update(loadedMsg{gen: model.(Model).loadGen, review: source.Review{
+		PullRequest: &github.PullRequest{HeadRefName: "feat/fix"},
+	}})
+
+	m, _ := press(model.(Model), "p")
+	found := checkoutMsg{gen: m.loadGen, branch: "feat/fix", worktree: source.Worktree{Path: "/repo-fix", Branch: "feat/fix"}, found: true}
+
+	// A search from an earlier switch must not move the checkout.
+	stale := found
+	stale.gen--
+	model, _ = m.Update(stale)
+	if dir := model.(Model).source.(source.Local).Dir; dir != "" {
+		t.Errorf("a stale search moved the checkout to %q", dir)
+	}
+
+	model, _ = model.Update(found)
+	if dir := model.(Model).source.(source.Local).Dir; dir != "/repo-fix" {
+		t.Errorf("got dir %q, want the worktree of the pull request branch", dir)
+	}
+
+	missing := checkoutMsg{gen: m.loadGen, branch: "feat/fix"}
+	model, _ = m.Update(missing)
+	m = model.(Model)
+	if m.source.(source.Local).Dir != "" || !strings.Contains(m.status, "feat/fix") {
+		t.Errorf("got dir %q and status %q, want the current checkout and a notice", m.source.(source.Local).Dir, m.status)
 	}
 }

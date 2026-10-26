@@ -75,6 +75,13 @@ type (
 		worktrees []source.Worktree
 		err       error
 	}
+	checkoutMsg struct {
+		gen      int
+		branch   string
+		worktree source.Worktree
+		found    bool
+		err      error
+	}
 	clearStatusMsg struct{ id int }
 )
 
@@ -88,7 +95,11 @@ type lineKey struct {
 
 // Model is the Bubble Tea model of the review screen.
 type Model struct {
-	source        source.Source
+	source source.Source
+
+	// other is the view that the switch key shows: the pull request of the branch for local changes,
+	// or the local changes for a pull request. It is nil when there is nothing to switch to.
+	other         source.Source
 	sender        agent.Sender
 	markdownStyle string
 
@@ -167,27 +178,28 @@ func New(src source.Source, sender agent.Sender, turns <-chan struct{}, markdown
 	composer.KeyMap.InsertNewline.SetKeys("alt+enter", "ctrl+j")
 	composer.FocusedStyle.CursorLine = lipgloss.NewStyle()
 
-	_, local := src.(source.Local)
 	keys := newBrowseKeys()
-	keys.Toggle.SetEnabled(local)
-	keys.Worktree.SetEnabled(local)
-	keys.Open.SetEnabled(!local)
 	if turns != nil {
 		keys.Toggle.SetHelp("t", "branch/uncommitted/last turn")
 	}
 
-	// A pull request opened without an agent has nobody to ask, so its comments only go to GitHub.
-	_, toClipboard := sender.(agent.Clipboard)
-	composeKeys := newComposeKeys()
-	composeKeys.Cycle.SetEnabled(!local && !toClipboard)
+	// The pull request of the current branch is what gh shows without a target.
+	var other source.Source
+	switch src.(type) {
+	case source.Local:
+		other = source.PullRequest{}
+	case source.PullRequest:
+		other = source.Local{}
+	}
 
 	m := Model{
 		source:        src,
+		other:         other,
 		sender:        sender,
 		markdownStyle: markdownStyle,
 		turns:         turns,
 		keys:          keys,
-		composeKeys:   composeKeys,
+		composeKeys:   newComposeKeys(),
 		pickKeys:      newPickKeys(),
 		help:          help.New(),
 		spinner:       spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(accentStyle)),
@@ -198,11 +210,31 @@ func New(src source.Source, sender agent.Sender, turns <-chan struct{}, markdown
 		loadStarted:   time.Now(),
 		anchor:        -1,
 	}
+	m.enableKeys()
+	return m
+}
+
+// enableKeys turns on the keys that work for the current source, and picks
+// where comments go.
+func (m *Model) enableKeys() {
+	_, local := m.source.(source.Local)
+	m.keys.Toggle.SetEnabled(local)
+	m.keys.Worktree.SetEnabled(local)
+	m.keys.Open.SetEnabled(!local)
+	m.keys.Switch.SetEnabled(m.other != nil)
+	if local {
+		m.keys.Switch.SetHelp("p", "pull request")
+	} else {
+		m.keys.Switch.SetHelp("p", "local changes")
+	}
+
+	// A pull request opened without an agent has nobody to ask, so its comments only go to GitHub.
+	_, toClipboard := m.sender.(agent.Clipboard)
+	m.composeKeys.Cycle.SetEnabled(!local && !toClipboard)
 	m.setDestination(toAgent)
 	if !local && toClipboard {
 		m.setDestination(toPullRequest)
 	}
-	return m
 }
 
 // Init starts the first load.
@@ -247,19 +279,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.reload()
 
 	case turnStartedMsg:
-		return m, tea.Batch(takeSnapshot(m.source.(source.Local).Dir), waitForTurn(m.turns))
+		return m, tea.Batch(takeSnapshot(m.localSource().Dir), waitForTurn(m.turns))
 
 	case snapshotMsg:
 		if msg.err != nil {
 			return m, m.setStatus(errorStyle.Render("Save the start of the agent's turn: " + msg.err.Error()))
 		}
-		local := m.source.(source.Local)
+		local := m.localSource()
 
 		// The turn that just ended changed files, so its start becomes the fallback for a turn without edits.
 		if local.TurnStart != "" && msg.tree != local.TurnStart {
 			local.PreviousTurnStart = local.TurnStart
 		}
 		local.TurnStart = msg.tree
+
+		// The pull request shows now, so the snapshot waits for a switch back to the local changes.
+		if _, showing := m.source.(source.Local); !showing {
+			m.other = local
+			return m, nil
+		}
+
 		m.source = local
 		if local.Scope != source.LastTurn {
 			return m, nil
@@ -297,6 +336,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.worktrees, m.pick, m.mode = msg.worktrees, 0, picking
 		return m, nil
+
+	case checkoutMsg:
+		// A newer switch or load replaced this search.
+		if msg.gen != m.loadGen {
+			return m, nil
+		}
+
+		if msg.found && !msg.worktree.Current {
+			return m.switchWorktree(msg.worktree)
+		}
+
+		// Without a checkout of the branch, the current checkout is the best match. A failed search
+		// shows the current checkout too, and its load reports any problem with the repository.
+		if msg.err == nil && !msg.found {
+			return m, tea.Batch(m.reload(), m.setStatus(dimStyle.Render("No worktree has "+msg.branch+" checked out.")))
+		}
+		return m, m.reload()
 
 	// main sends the notice when its check finds a newer release.
 	case update.Notice:
@@ -417,6 +473,8 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.reload(), m.setStatus(dimStyle.Render("Showing "+local.Scope.String()+"…")))
 	case key.Matches(msg, m.keys.Worktree):
 		return m, listWorktrees(m.source.(source.Local).Dir)
+	case key.Matches(msg, m.keys.Switch):
+		return m.switchSource()
 	case key.Matches(msg, m.keys.Reload):
 		return m, tea.Batch(m.reload(), m.setStatus(dimStyle.Render("Reloading…")))
 	case key.Matches(msg, m.keys.Open):
@@ -462,11 +520,55 @@ func (m Model) switchWorktree(w source.Worktree) (tea.Model, tea.Cmd) {
 	local.TurnStart, local.PreviousTurnStart = "", ""
 	m.source = local
 
+	// The switch key shows the pull request of the branch in the new checkout.
+	if _, ok := m.other.(source.PullRequest); ok {
+		m.other = source.PullRequest{Dir: w.Path}
+	}
+
 	m.review, m.loadErr, m.files, m.rows, m.fileStarts = nil, nil, nil, nil, nil
 	m.collapsed = map[string]bool{}
 	m.cursor, m.offset, m.anchor = 0, 0, -1
 	m.loading = true
 	return m, tea.Batch(m.reload(), m.spinner.Tick)
+}
+
+// switchSource swaps between the local changes and the pull request. Each
+// side keeps its own settings, such as the local scope and the turn
+// snapshots. The page and the cursor belong to the old diff, so they start over.
+func (m Model) switchSource() (tea.Model, tea.Cmd) {
+	var branch string
+	if m.review != nil && m.review.PullRequest != nil {
+		branch = m.review.PullRequest.HeadRefName
+	}
+
+	m.source, m.other = m.other, m.source
+	m.enableKeys()
+
+	// A local check that is still planned would reload the pull request.
+	m.watchGen++
+
+	m.review, m.loadErr, m.files, m.rows, m.fileStarts = nil, nil, nil, nil, nil
+	m.collapsed = map[string]bool{}
+	m.descriptionExpanded = false
+	m.cursor, m.offset, m.anchor = 0, 0, -1
+	m.loading = true
+
+	// The local changes of a pull request are in the checkout of its branch, which can be another worktree.
+	local, toLocal := m.source.(source.Local)
+	if toLocal && branch != "" {
+		m.loadGen++
+		return m, tea.Batch(findCheckout(local.Dir, branch, m.loadGen), m.spinner.Tick)
+	}
+	return m, tea.Batch(m.reload(), m.spinner.Tick)
+}
+
+// localSource returns the local changes, whether they show now or wait
+// behind the switch key.
+func (m Model) localSource() source.Local {
+	if local, ok := m.source.(source.Local); ok {
+		return local
+	}
+	return m.other.(source.Local)
 }
 
 // updateComposer handles keys while the user writes a comment.
@@ -1177,6 +1279,21 @@ func listWorktrees(dir string) tea.Cmd {
 	return func() tea.Msg {
 		worktrees, err := source.Worktrees(dir)
 		return worktreesMsg{worktrees, err}
+	}
+}
+
+// findCheckout looks for the worktree that has the branch checked out.
+func findCheckout(dir, branch string, gen int) tea.Cmd {
+	return func() tea.Msg {
+		worktrees, err := source.Worktrees(dir)
+		msg := checkoutMsg{gen: gen, branch: branch, err: err}
+		for _, w := range worktrees {
+			if w.Branch == branch {
+				msg.worktree, msg.found = w, true
+				break
+			}
+		}
+		return msg
 	}
 }
 
