@@ -37,7 +37,7 @@ func newBrowseKeys() browseKeys {
 
 // ShortHelp lists the keys for the one-line footer.
 func (k browseKeys) ShortHelp() []key.Binding {
-	return []key.Binding{k.Select, k.Comment, k.NextFile, k.Toggle, k.Worktree, k.Open, k.Help, k.Quit}
+	return []key.Binding{k.Select, k.Comment, k.Toggle, k.Worktree, k.Open, k.Help, k.Quit}
 }
 
 // FullHelp lists every key, grouped in columns.
