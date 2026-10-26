@@ -10,6 +10,14 @@ Focus your agent's pane and press the key to review the local changes. To review
 rex do rexdiff pr=https://github.com/owner/repo/pull/123
 ```
 
+The pane shows the checkout that the agent started in. When the agent works in a worktree, give the directory of that worktree to show its changes:
+
+```sh
+rex do rexdiff dir=/path/to/worktree
+```
+
+The agent skill tells the agent to do this when it moves to another worktree. You can also ask the agent to do it.
+
 To change the options, edit the `setup` call in `~/.config/rex/init.lua` and run `rex config reload`:
 
 ```lua

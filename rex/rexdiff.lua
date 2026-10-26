@@ -10,6 +10,8 @@
 ---
 --- Then press the key for the local changes, or run the action with a pull
 --- request: rex do rexdiff pr=https://github.com/owner/repo/pull/123
+--- Give a directory to show the local changes of another checkout, such as a
+--- worktree that an agent works in: rex do rexdiff dir=/path/to/worktree
 local M = {}
 
 --- Labels the rexdiff pane, so the action can find it again.
@@ -60,13 +62,13 @@ function M.setup(opts)
     title       = "Toggle Diff Review",
     description = "Review the local changes, or a pull request, beside the focused pane.",
     keywords    = "diff review pull request pr",
-    args        = { pr = "string?" },
+    args        = { pr = "string?", dir = "string?" },
     run         = function(ctx, args)
       local open = find_pane()
       if open then rex.call("block.close", { session_id = ctx.session_id, block_id = open }) end
 
-      -- Without a pull request the action toggles, so a second key press only closes the pane.
-      if open and not args.pr then return { closed = open } end
+      -- Without a pull request or a directory the action toggles, so a second key press only closes the pane.
+      if open and not args.pr and not args.dir then return { closed = open } end
 
       local command = { bin }
       if ctx.block_id then
@@ -84,7 +86,7 @@ function M.setup(opts)
         layout    = { block = {
           flavor  = "com.superlogical.terminal.shell",
           label   = LABEL,
-          options = { command = command, cwd = pane_dir(ctx.block_id) },
+          options = { command = command, cwd = args.dir or pane_dir(ctx.block_id) },
         } },
       }
       if err ~= nil then error(err, 0) end
