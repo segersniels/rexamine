@@ -85,6 +85,8 @@ func press(m Model, keys ...string) (Model, tea.Cmd) {
 			msg = tea.KeyMsg{Type: tea.KeyEsc}
 		case "shift+tab":
 			msg = tea.KeyMsg{Type: tea.KeyShiftTab}
+		case "down":
+			msg = tea.KeyMsg{Type: tea.KeyDown}
 		}
 		model, cmd = model.Update(msg)
 	}
@@ -724,5 +726,41 @@ func TestHideTestsKeyHidesTestFilesAndSavesTheSetting(t *testing.T) {
 	m, _ = press(m, "x")
 	if view := ansi.Strip(m.View()); !strings.Contains(view, "settings-mapper.spec.ts") {
 		t.Errorf("the page does not show the test file again:\n%s", view)
+	}
+}
+
+func TestFindFileJumpsToTheChosenFile(t *testing.T) {
+	review := testReview()
+	review.Diff = ""
+	for _, path := range []string{"cmd/main.go", "internal/ui/model.go", "internal/ui/model_test.go", "README.md"} {
+		review.Diff += "diff --git a/" + path + " b/" + path + "\n--- a/" + path + "\n+++ b/" + path + "\n@@ -1 +1 @@\n-old\n+new\n"
+	}
+	var model tea.Model = New(fakeSource{review}, &fakeSender{}, nil, "dark", config.Config{})
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 40, Height: 20})
+	model, _ = model.Update(loadedMsg{gen: 1, review: review})
+
+	// Case does not matter, and the list keeps the page order.
+	m, _ := press(model.(Model), "/", "U", "I", "/")
+	if m.mode != finding {
+		t.Fatal("finder did not open")
+	}
+	view := ansi.Strip(m.View())
+	if !strings.Contains(view, "internal/ui/model.go") || !strings.Contains(view, "internal/ui/model_test.go") || strings.Contains(view, "cmd/main.go") {
+		t.Errorf("finder does not show only the matching files:\n%s", view)
+	}
+
+	m, _ = press(m, "down", "enter")
+	if m.mode != browsing || m.cursor != m.fileStarts[2] {
+		t.Errorf("got mode %d and cursor %d, want the title of the third file at %d", m.mode, m.cursor, m.fileStarts[2])
+	}
+
+	// Without a match, enter does nothing and esc goes back to the same place.
+	m, _ = press(m, "/", "z", "z", "z", "enter")
+	if m.mode != finding || !strings.Contains(ansi.Strip(m.View()), "No matching files.") {
+		t.Errorf("finder closed or does not say that nothing matches:\n%s", ansi.Strip(m.View()))
+	}
+	m, _ = press(m, "esc")
+	if m.mode != browsing || m.cursor != m.fileStarts[2] {
+		t.Errorf("got mode %d and cursor %d after esc, want the page at %d", m.mode, m.cursor, m.fileStarts[2])
 	}
 }

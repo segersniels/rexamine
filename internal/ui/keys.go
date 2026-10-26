@@ -6,7 +6,7 @@ import "github.com/charmbracelet/bubbles/key"
 type browseKeys struct {
 	Up, Down, HalfUp, HalfDown, PageUp, PageDown key.Binding
 	Top, Bottom, NextFile, PrevFile, Collapse    key.Binding
-	HideTests                                    key.Binding
+	FindFile, HideTests                          key.Binding
 	Select, Comment, Clear                       key.Binding
 	Toggle, Worktree, Switch, Open, Reload       key.Binding
 	Help, Quit                                   key.Binding
@@ -24,6 +24,7 @@ func newBrowseKeys() browseKeys {
 		Bottom:   key.NewBinding(key.WithKeys("G", "end"), key.WithHelp("G", "end")),
 		NextFile: key.NewBinding(key.WithKeys("]"), key.WithHelp("]", "next file")),
 		PrevFile: key.NewBinding(key.WithKeys("["), key.WithHelp("[", "previous file")),
+		FindFile: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "find file")),
 		Collapse: key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "collapse/expand")),
 		Select:   key.NewBinding(key.WithKeys("v", "V"), key.WithHelp("v", "select")),
 		Comment:  key.NewBinding(key.WithKeys("c", "enter"), key.WithHelp("c", "comment")),
@@ -50,7 +51,7 @@ func (k browseKeys) ShortHelp() []key.Binding {
 func (k browseKeys) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.HalfUp, k.HalfDown, k.PageUp, k.PageDown},
-		{k.Top, k.Bottom, k.NextFile, k.PrevFile, k.Collapse, k.HideTests},
+		{k.Top, k.Bottom, k.NextFile, k.PrevFile, k.FindFile, k.Collapse, k.HideTests},
 		{k.Select, k.Comment, k.Clear},
 		{k.Toggle, k.Worktree, k.Switch, k.Open, k.Reload, k.Help, k.Quit},
 	}
@@ -104,5 +105,30 @@ func (k pickKeys) ShortHelp() []key.Binding {
 
 // FullHelp lists the picker keys in one column.
 func (k pickKeys) FullHelp() [][]key.Binding {
+	return [][]key.Binding{k.ShortHelp()}
+}
+
+// findKeys holds the keys for finding a file. Letters go to the query, so the
+// keys to move are arrows and control keys.
+type findKeys struct {
+	Up, Down, Jump, Cancel key.Binding
+}
+
+func newFindKeys() findKeys {
+	return findKeys{
+		Up:     key.NewBinding(key.WithKeys("up", "ctrl+p"), key.WithHelp("↑/ctrl+p", "up")),
+		Down:   key.NewBinding(key.WithKeys("down", "ctrl+n"), key.WithHelp("↓/ctrl+n", "down")),
+		Jump:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "go to file")),
+		Cancel: key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+	}
+}
+
+// ShortHelp lists the finder keys for the footer.
+func (k findKeys) ShortHelp() []key.Binding {
+	return []key.Binding{k.Up, k.Down, k.Jump, k.Cancel}
+}
+
+// FullHelp lists the finder keys in one column.
+func (k findKeys) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }

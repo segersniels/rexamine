@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -38,14 +39,15 @@ const focusCooldown = 30 * time.Second
 // composerIndent is how far the comment box is indented under the code.
 const composerIndent = 2
 
-// mode tells whether keys go to the page, to the comment composer, or to the
-// worktree picker.
+// mode tells whether keys go to the page, to the comment composer, to the
+// worktree picker, or to the file finder.
 type mode int
 
 const (
 	browsing mode = iota
 	composing
 	picking
+	finding
 )
 
 // destination tells where the composer sends a comment.
@@ -111,6 +113,7 @@ type Model struct {
 	keys        browseKeys
 	composeKeys composeKeys
 	pickKeys    pickKeys
+	findKeys    findKeys
 	help        help.Model
 	spinner     spinner.Model
 	composer    textarea.Model
@@ -167,6 +170,10 @@ type Model struct {
 	worktrees []source.Worktree
 	pick      int
 
+	// finder holds the query of the file finder, and selectedMatch is the match under its cursor.
+	finder        textinput.Model
+	selectedMatch int
+
 	status   string
 	statusID int
 
@@ -185,6 +192,10 @@ func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, m
 	composer.SetHeight(3)
 	composer.KeyMap.InsertNewline.SetKeys("alt+enter", "ctrl+j")
 	composer.FocusedStyle.CursorLine = lipgloss.NewStyle()
+
+	finder := textinput.New()
+	finder.Prompt = "/ "
+	finder.Placeholder = "Type part of a path…"
 
 	keys := newBrowseKeys()
 	if turns != nil {
@@ -210,9 +221,11 @@ func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, m
 		keys:          keys,
 		composeKeys:   newComposeKeys(),
 		pickKeys:      newPickKeys(),
+		findKeys:      newFindKeys(),
 		help:          help.New(),
 		spinner:       spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(accentStyle)),
 		composer:      composer,
+		finder:        finder,
 		collapsed:     map[string]bool{},
 		loading:       true,
 		loadGen:       1,
@@ -382,11 +395,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateComposer(msg)
 		case picking:
 			return m.updatePicker(msg)
+		case finding:
+			return m.updateFinder(msg)
 		}
 		return m.updateBrowser(msg)
 
 	case tea.MouseMsg:
-		if m.mode == picking {
+		if m.mode == picking || m.mode == finding {
 			return m, nil
 		}
 		return m, m.handleMouse(msg)
@@ -465,6 +480,8 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.jumpToFile(1)
 	case key.Matches(msg, m.keys.PrevFile):
 		m.jumpToFile(-1)
+	case key.Matches(msg, m.keys.FindFile):
+		return m, m.startFinder()
 	case key.Matches(msg, m.keys.Collapse):
 		if m.cursor < len(m.rows) && m.rows[m.cursor].kind == descriptionRow {
 			m.toggleDescription()
@@ -529,6 +546,71 @@ func (m Model) updatePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.switchWorktree(m.worktrees[m.pick])
 	}
 	return m, nil
+}
+
+// startFinder opens the file finder with an empty query.
+func (m *Model) startFinder() tea.Cmd {
+	if len(m.files) == 0 {
+		return nil
+	}
+
+	m.mode = finding
+	m.selectedMatch = 0
+	m.finder.Reset()
+	return m.finder.Focus()
+}
+
+// updateFinder handles keys while the user finds a file. Other keys edit the
+// query, and a new query moves the cursor back to the first match.
+func (m Model) updateFinder(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	matches := m.matchingFiles()
+
+	switch {
+	case key.Matches(msg, m.findKeys.Up):
+		m.selectedMatch = max(0, m.selectedMatch-1)
+		return m, nil
+	case key.Matches(msg, m.findKeys.Down):
+		m.selectedMatch = clamp(m.selectedMatch+1, 0, len(matches)-1)
+		return m, nil
+	case key.Matches(msg, m.findKeys.Cancel):
+		m.mode = browsing
+		m.finder.Blur()
+		return m, nil
+	case key.Matches(msg, m.findKeys.Jump):
+		if len(matches) == 0 {
+			return m, nil
+		}
+		m.mode = browsing
+		m.finder.Blur()
+
+		// A reload can remove files while the finder is open, so the cursor can be past the last match.
+		file := matches[min(m.selectedMatch, len(matches)-1)]
+		title := m.fileStarts[file]
+		m.cursor, m.offset = title, title
+		m.clamp()
+		return m, nil
+	}
+
+	query := m.finder.Value()
+	var cmd tea.Cmd
+	m.finder, cmd = m.finder.Update(msg)
+	if m.finder.Value() != query {
+		m.selectedMatch = 0
+	}
+	return m, cmd
+}
+
+// matchingFiles lists the indexes of the shown files whose path contains the
+// query, in page order. Case does not matter.
+func (m Model) matchingFiles() []int {
+	query := strings.ToLower(m.finder.Value())
+	var matches []int
+	for i, file := range m.files {
+		if strings.Contains(strings.ToLower(file.Path), query) {
+			matches = append(matches, i)
+		}
+	}
+	return matches
 }
 
 // switchWorktree shows the local changes of another checkout. The turn
@@ -1067,6 +1149,8 @@ func (m Model) View() string {
 		return ""
 	case m.mode == picking:
 		return m.pickerView()
+	case m.mode == finding:
+		return m.finderView()
 	case m.review == nil && m.loadErr != nil:
 		return ansi.Wrap(errorStyle.Render(m.loadErr.Error()), m.width, "") + "\n\n" + dimStyle.Render("r retry · q quit")
 	case m.review == nil:
@@ -1116,6 +1200,41 @@ func (m Model) pickerView() string {
 	}
 
 	return strings.Join([]string{bar, strings.Join(lines, "\n"), m.footerView()}, "\n")
+}
+
+// finderView shows the query and the files that match it.
+func (m Model) finderView() string {
+	title := ansi.Truncate(" Find file", m.width, "…")
+	bar := barStyle.Render(title + strings.Repeat(" ", max(0, m.width-ansi.StringWidth(title))))
+
+	finder := m.finder
+	finder.Width = max(1, m.contentWidth()-ansi.StringWidth(finder.Prompt)-1)
+	input := " " + finder.View()
+
+	// The list scrolls only as far as it must to keep the cursor on the screen.
+	matches := m.matchingFiles()
+	height := max(1, m.bodyHeight()-1)
+	start := max(0, m.selectedMatch-height+1)
+
+	lines := make([]string, height)
+	if len(matches) == 0 {
+		lines[0] = "  " + dimStyle.Render("No matching files.")
+	}
+	for y := range lines {
+		i := start + y
+		if i >= len(matches) {
+			break
+		}
+
+		marker := " "
+		if i == m.selectedMatch {
+			marker = accentStyle.Render("▌")
+		}
+		path := ansi.Truncate(m.files[matches[i]].Path, max(1, m.contentWidth()-2), "…")
+		lines[y] = marker + " " + path
+	}
+
+	return strings.Join([]string{bar, input, strings.Join(lines, "\n"), m.footerView()}, "\n")
 }
 
 // topBarView shows the file at the top of the screen, or the review's title
@@ -1274,6 +1393,8 @@ func (m Model) footerView() string {
 		footer = m.help.View(m.composeKeys)
 	case m.mode == picking:
 		footer = m.help.View(m.pickKeys)
+	case m.mode == finding:
+		footer = m.help.View(m.findKeys)
 	}
 
 	// Help cuts its own line short, but not on every width, so cut each line here too.
