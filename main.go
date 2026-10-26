@@ -221,8 +221,8 @@ func runUpdate() int {
 	return 0
 }
 
-// runUninstall removes what setup installed, the update check's cache, and
-// then the binary. The binary goes last, so a failed step can run again.
+// runUninstall removes what setup installed, the update check's cache, the
+// settings, and then the binary. The binary goes last, so a failed step can run again.
 func runUninstall() int {
 	if err := setup.Uninstall(os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
@@ -230,6 +230,11 @@ func runUninstall() int {
 	}
 
 	if err := update.RemoveCache(); err != nil {
+		fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
+		return 1
+	}
+
+	if err := config.Remove(); err != nil {
 		fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
 		return 1
 	}

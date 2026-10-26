@@ -39,3 +39,18 @@ func TestLoadWithABrokenFileGivesTheDefaults(t *testing.T) {
 		t.Errorf("Load() = %+v, want the defaults", got)
 	}
 }
+
+func TestRemoveDeletesTheSettingsFolder(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	if err := Save(Config{HideTests: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Remove(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "rexdiff")); !os.IsNotExist(err) {
+		t.Errorf("the settings folder still exists: %v", err)
+	}
+}

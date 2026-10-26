@@ -85,4 +85,5 @@ rexdiff uninstall
 - The Rex module and the lines that `rexdiff setup` added to `init.lua`. Then it reloads the Rex configuration. If you wrote your own lines to load rexdiff, it tells you to remove them yourself.
 - The agent skill, for every supported agent, also for agents that you removed.
 - The cache of the update check.
+- The saved settings in `~/.config/rexdiff`.
 - The binary. For an npm install, it runs `npm uninstall -g @segersniels/rexdiff`.

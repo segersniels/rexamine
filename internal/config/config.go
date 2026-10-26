@@ -52,6 +52,15 @@ func Save(c Config) error {
 	return os.WriteFile(path, append(data, '\n'), 0o644)
 }
 
+// Remove removes the settings and their folder, for an uninstall.
+func Remove() error {
+	path, err := filePath()
+	if err != nil {
+		return err
+	}
+	return os.RemoveAll(filepath.Dir(path))
+}
+
 // filePath finds the settings file in $XDG_CONFIG_HOME, or in ~/.config
 // without it.
 func filePath() (string, error) {
