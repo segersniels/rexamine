@@ -6,6 +6,7 @@ import "github.com/charmbracelet/bubbles/key"
 type browseKeys struct {
 	Up, Down, HalfUp, HalfDown, PageUp, PageDown key.Binding
 	Top, Bottom, NextFile, PrevFile, Collapse    key.Binding
+	HideTests                                    key.Binding
 	Select, Comment, Clear                       key.Binding
 	Toggle, Worktree, Switch, Open, Reload       key.Binding
 	Help, Quit                                   key.Binding
@@ -34,6 +35,9 @@ func newBrowseKeys() browseKeys {
 		Reload:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload")),
 		Help:     key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 		Quit:     key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
+
+		// The help lists this key, but the docs leave it out.
+		HideTests: key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "hide/show tests")),
 	}
 }
 
@@ -46,7 +50,7 @@ func (k browseKeys) ShortHelp() []key.Binding {
 func (k browseKeys) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.HalfUp, k.HalfDown, k.PageUp, k.PageDown},
-		{k.Top, k.Bottom, k.NextFile, k.PrevFile, k.Collapse},
+		{k.Top, k.Bottom, k.NextFile, k.PrevFile, k.Collapse, k.HideTests},
 		{k.Select, k.Comment, k.Clear},
 		{k.Toggle, k.Worktree, k.Switch, k.Open, k.Reload, k.Help, k.Quit},
 	}

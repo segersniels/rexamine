@@ -5,6 +5,7 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/segersniels/rexdiff/internal/agent"
+	"github.com/segersniels/rexdiff/internal/config"
 	"github.com/segersniels/rexdiff/internal/diff"
 	"github.com/segersniels/rexdiff/internal/github"
 	"github.com/segersniels/rexdiff/internal/source"
@@ -113,9 +115,15 @@ type Model struct {
 	spinner     spinner.Model
 	composer    textarea.Model
 
-	review  *source.Review
+	review *source.Review
+
+	// parsed holds every file of the diff, and files holds the files that the page shows.
+	parsed  []diff.File
 	files   []diff.File
 	loadErr error
+
+	// settings last between runs, such as whether the page hides test files.
+	settings config.Config
 
 	// highlights holds the syntax colors of files. They are computed once per
 	// load, because a new layout on each resize must stay fast.
@@ -168,8 +176,8 @@ type Model struct {
 
 // New creates the review screen. Comments go to the sender. turns reports when
 // the agent starts a turn, or is nil without an agent to watch. markdownStyle
-// is a glamour style name, such as "dark".
-func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, markdownStyle string) Model {
+// is a glamour style name, such as "dark". settings are the saved settings.
+func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, markdownStyle string, settings config.Config) Model {
 	composer := textarea.New()
 	composer.ShowLineNumbers = false
 	composer.Prompt = ""
@@ -197,6 +205,7 @@ func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, m
 		other:         other,
 		sender:        sender,
 		markdownStyle: markdownStyle,
+		settings:      settings,
 		turns:         turns,
 		keys:          keys,
 		composeKeys:   newComposeKeys(),
@@ -413,10 +422,20 @@ func (m Model) handleLoaded(msg loadedMsg) (tea.Model, tea.Cmd) {
 
 	m.loadErr = nil
 	m.review = &msg.review
-	files := diff.Parse(msg.review.Diff)
+	m.parsed = diff.Parse(msg.review.Diff)
+	m.showFiles()
+	return m, watch
+}
+
+// showFiles lays out the parsed files. It leaves out the test files when the
+// settings hide them.
+func (m *Model) showFiles() {
+	files := m.parsed
+	if m.settings.HideTests {
+		files = slices.DeleteFunc(slices.Clone(files), diff.File.IsTest)
+	}
 	m.highlights = highlightFiles(files, m.markdownStyle)
 	m.layout(files)
-	return m, watch
 }
 
 // updateBrowser handles keys while the user reads the page.
@@ -452,6 +471,16 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.toggleFile(m.cursor)
 		}
+	case key.Matches(msg, m.keys.HideTests):
+		m.settings.HideTests = !m.settings.HideTests
+		m.showFiles()
+		if err := config.Save(m.settings); err != nil {
+			return m, m.setStatus(errorStyle.Render("Save the settings: " + err.Error()))
+		}
+		if m.settings.HideTests {
+			return m, m.setStatus(dimStyle.Render("Hiding test files."))
+		}
+		return m, m.setStatus(dimStyle.Render("Showing test files."))
 	case key.Matches(msg, m.keys.Select):
 		return m, m.toggleSelection()
 	case key.Matches(msg, m.keys.Clear):
@@ -728,7 +757,8 @@ func (m *Model) layout(files []diff.File) {
 	}
 
 	m.files = files
-	m.rows, m.fileStarts = layoutPage(*m.review, files, m.highlights, m.contentWidth(), m.markdownStyle, m.collapsed, m.descriptionExpanded)
+	hiddenTests := len(m.parsed) - len(files)
+	m.rows, m.fileStarts = layoutPage(*m.review, files, hiddenTests, m.highlights, m.contentWidth(), m.markdownStyle, m.collapsed, m.descriptionExpanded)
 
 	m.cursor = int(progress * float64(len(m.rows)))
 	if i, ok := m.findLine(cursorKey); cursorOnLine && ok {

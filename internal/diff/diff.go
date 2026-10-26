@@ -2,6 +2,8 @@
 package diff
 
 import (
+	"path"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -56,6 +58,48 @@ type File struct {
 // IsRenamed reports whether the file moved to a new path.
 func (f File) IsRenamed() bool {
 	return !f.IsNew && !f.IsDeleted && f.OldPath != "" && f.OldPath != f.Path
+}
+
+// testDirs are folders that hold only tests and their snapshots.
+var testDirs = []string{"__tests__", "__snapshots__"}
+
+// testSuffixes end the name of a test file before its extension, such as
+// foo.spec.ts or foo_test.go.
+var testSuffixes = []string{".test", ".spec", "_test", "_spec"}
+
+// classTestSuffixes end the name of a test file in languages that name a
+// file after its class, such as FooTest.java.
+var classTestSuffixes = map[string][]string{
+	".java":  {"Test", "Tests"},
+	".kt":    {"Test", "Tests"},
+	".scala": {"Test", "Spec"},
+	".swift": {"Test", "Tests"},
+	".cs":    {"Test", "Tests"},
+}
+
+// IsTest reports whether the file holds only tests, from its path.
+func (f File) IsTest() bool {
+	for _, dir := range testDirs {
+		if strings.Contains("/"+f.Path, "/"+dir+"/") {
+			return true
+		}
+	}
+
+	name := path.Base(f.Path)
+	ext := path.Ext(name)
+	stem := strings.TrimSuffix(name, ext)
+
+	// pytest also finds tests in files that start with test_.
+	if ext == ".py" && strings.HasPrefix(stem, "test_") {
+		return true
+	}
+
+	for _, suffix := range slices.Concat(testSuffixes, classTestSuffixes[ext]) {
+		if strings.HasSuffix(stem, suffix) && stem != suffix {
+			return true
+		}
+	}
+	return false
 }
 
 // Stats counts the added and removed lines in the file.

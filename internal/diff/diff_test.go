@@ -94,3 +94,28 @@ func TestParseKeepsDashLinesInsideHunks(t *testing.T) {
 		t.Errorf("path changed by a hunk line: %q", files[0].Path)
 	}
 }
+
+func TestIsTestFindsTestFilesByTheirPath(t *testing.T) {
+	tests := map[string]bool{
+		"src/mapper.spec.ts":                    true,
+		"src/mapper.test.tsx":                   true,
+		"internal/diff/diff_test.go":            true,
+		"tests/test_mapper.py":                  true,
+		"lib/mapper_spec.rb":                    true,
+		"src/test/java/MapperTest.java":         true,
+		"app/MapperTests.swift":                 true,
+		"src/__tests__/mapper.ts":               true,
+		"src/__snapshots__/mapper.test.ts.snap": true,
+		"src/mapper.ts":                         false,
+		"src/test.ts":                           false,
+		"src/latest.go":                         false,
+		"src/contest.py":                        false,
+		"src/MapperTest.ts":                     false,
+		"test/fixtures/data.json":               false,
+	}
+	for path, want := range tests {
+		if got := (File{Path: path}).IsTest(); got != want {
+			t.Errorf("IsTest(%q) = %v, want %v", path, got, want)
+		}
+	}
+}

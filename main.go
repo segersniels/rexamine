@@ -17,6 +17,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/segersniels/rexdiff/internal/agent"
+	"github.com/segersniels/rexdiff/internal/config"
 	"github.com/segersniels/rexdiff/internal/setup"
 	"github.com/segersniels/rexdiff/internal/source"
 	"github.com/segersniels/rexdiff/internal/ui"
@@ -130,7 +131,7 @@ func run() int {
 		markdownStyle = "dark"
 	}
 
-	program := tea.NewProgram(ui.New(src, sender, turns, markdownStyle), tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus())
+	program := tea.NewProgram(ui.New(src, sender, turns, markdownStyle, config.Load()), tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus())
 
 	// The check can wait on the network, so it runs beside the screen and never delays it.
 	go func() {

@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/segersniels/rexdiff/internal/agent"
+	"github.com/segersniels/rexdiff/internal/config"
 	"github.com/segersniels/rexdiff/internal/diff"
 	"github.com/segersniels/rexdiff/internal/github"
 	"github.com/segersniels/rexdiff/internal/source"
@@ -64,7 +65,7 @@ func newLoadedModel(t *testing.T, sender *fakeSender, width, height int) Model {
 	t.Helper()
 	review := testReview()
 
-	var model tea.Model = New(fakeSource{review}, sender, nil, "dark")
+	var model tea.Model = New(fakeSource{review}, sender, nil, "dark", config.Config{})
 	model, _ = model.Update(tea.WindowSizeMsg{Width: width, Height: height})
 	model, _ = model.Update(loadedMsg{gen: 1, review: review})
 	return model.(Model)
@@ -313,7 +314,7 @@ func newLongDescriptionModel(t *testing.T) Model {
 	review := testReview()
 	review.PullRequest.Body = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.\n\nThe last paragraph."
 
-	var model tea.Model = New(fakeSource{review}, &fakeSender{}, nil, "dark")
+	var model tea.Model = New(fakeSource{review}, &fakeSender{}, nil, "dark", config.Config{})
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 60, Height: 60})
 	model, _ = model.Update(loadedMsg{gen: 1, review: review})
 	return model.(Model)
@@ -393,7 +394,7 @@ func TestUpdateNoticeWrapsInNarrowScreens(t *testing.T) {
 }
 
 func TestTurnWithoutEditsKeepsThePreviousTurnStart(t *testing.T) {
-	var model tea.Model = New(source.Local{}, &fakeSender{}, make(chan agent.TurnEvent), "dark")
+	var model tea.Model = New(source.Local{}, &fakeSender{}, make(chan agent.TurnEvent), "dark", config.Config{})
 
 	// Each snapshot is the working tree at the start of a turn. The second turn changes nothing.
 	for _, tree := range []string{"first", "second", "second"} {
@@ -408,7 +409,7 @@ func TestTurnWithoutEditsKeepsThePreviousTurnStart(t *testing.T) {
 
 func TestTurnEventsTrackTheAgentsTurn(t *testing.T) {
 	turns := make(chan agent.TurnEvent)
-	var model tea.Model = New(source.Local{}, &fakeSender{}, turns, "dark")
+	var model tea.Model = New(source.Local{}, &fakeSender{}, turns, "dark", config.Config{})
 
 	// rexdiff opened while the agent worked, so it saves the working tree from now.
 	model, cmd := model.Update(turnMsg{agent.TurnJoined})
@@ -461,7 +462,7 @@ func TestShiftTabDoesNothingForLocalChanges(t *testing.T) {
 	review := testReview()
 	review.PullRequest = nil
 
-	var model tea.Model = New(source.Local{}, &fakeSender{}, nil, "dark")
+	var model tea.Model = New(source.Local{}, &fakeSender{}, nil, "dark", config.Config{})
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: 60})
 	model, _ = model.Update(loadedMsg{gen: 1, review: review})
 
@@ -493,7 +494,7 @@ func TestReviewCommentUsesTheSideOfEachLine(t *testing.T) {
 func TestPullRequestWithoutAnAgentOnlyCommentsOnGitHub(t *testing.T) {
 	review := testReview()
 
-	var model tea.Model = New(fakeSource{review}, agent.Clipboard{}, nil, "dark")
+	var model tea.Model = New(fakeSource{review}, agent.Clipboard{}, nil, "dark", config.Config{})
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: 60})
 	model, _ = model.Update(loadedMsg{gen: 1, review: review})
 
@@ -508,7 +509,7 @@ func TestPullRequestWithoutAnAgentOnlyCommentsOnGitHub(t *testing.T) {
 
 func TestWorktreePickerSwitchesToTheChosenBranch(t *testing.T) {
 	src := source.Local{Dir: "/repo", TurnStart: "old", PreviousTurnStart: "older"}
-	var model tea.Model = New(src, &fakeSender{}, nil, "dark")
+	var model tea.Model = New(src, &fakeSender{}, nil, "dark", config.Config{})
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 40, Height: 20})
 	model, _ = model.Update(worktreesMsg{worktrees: []source.Worktree{
 		{Path: "/repo", Branch: "main", Main: true, Current: true},
@@ -556,7 +557,7 @@ func TestWorktreePickerSwitchesToTheChosenBranch(t *testing.T) {
 }
 
 func TestWorktreePickerWithOneCheckoutStaysClosed(t *testing.T) {
-	var model tea.Model = New(source.Local{}, &fakeSender{}, nil, "dark")
+	var model tea.Model = New(source.Local{}, &fakeSender{}, nil, "dark", config.Config{})
 	model, _ = model.Update(worktreesMsg{worktrees: []source.Worktree{{Path: "/repo", Branch: "main", Current: true}}})
 
 	if m := model.(Model); m.mode == picking || !strings.Contains(m.status, "no other worktrees") {
@@ -629,7 +630,7 @@ func TestReviewerChipsShowEachReviewerOnce(t *testing.T) {
 }
 
 func TestSwitchKeyMovesBetweenThePullRequestAndTheLocalChanges(t *testing.T) {
-	var model tea.Model = New(source.PullRequest{Target: "12"}, &fakeSender{}, make(chan agent.TurnEvent), "dark")
+	var model tea.Model = New(source.PullRequest{Target: "12"}, &fakeSender{}, make(chan agent.TurnEvent), "dark", config.Config{})
 
 	m, cmd := press(model.(Model), "p")
 	local, ok := m.source.(source.Local)
@@ -658,7 +659,7 @@ func TestSwitchKeyMovesBetweenThePullRequestAndTheLocalChanges(t *testing.T) {
 }
 
 func TestSwitchKeyShowsThePullRequestOfTheBranch(t *testing.T) {
-	m, _ := press(New(source.Local{}, &fakeSender{}, nil, "dark"), "p")
+	m, _ := press(New(source.Local{}, &fakeSender{}, nil, "dark", config.Config{}), "p")
 	if pr, ok := m.source.(source.PullRequest); !ok || pr.Target != "" {
 		t.Errorf("got source %#v, want the pull request of the current branch", m.source)
 	}
@@ -668,7 +669,7 @@ func TestSwitchKeyShowsThePullRequestOfTheBranch(t *testing.T) {
 }
 
 func TestSwitchToLocalChangesFindsTheWorktreeOfThePullRequest(t *testing.T) {
-	var model tea.Model = New(source.PullRequest{Target: "12"}, &fakeSender{}, nil, "dark")
+	var model tea.Model = New(source.PullRequest{Target: "12"}, &fakeSender{}, nil, "dark", config.Config{})
 	model, _ = model.Update(loadedMsg{gen: model.(Model).loadGen, review: source.Review{
 		PullRequest: &github.PullRequest{HeadRefName: "feat/fix"},
 	}})
@@ -694,5 +695,34 @@ func TestSwitchToLocalChangesFindsTheWorktreeOfThePullRequest(t *testing.T) {
 	m = model.(Model)
 	if m.source.(source.Local).Dir != "" || !strings.Contains(m.status, "feat/fix") {
 		t.Errorf("got dir %q and status %q, want the current checkout and a notice", m.source.(source.Local).Dir, m.status)
+	}
+}
+
+func TestHideTestsKeyHidesTestFilesAndSavesTheSetting(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	review := testReview()
+	review.Diff += `diff --git a/src/settings-mapper.spec.ts b/src/settings-mapper.spec.ts
+--- a/src/settings-mapper.spec.ts
++++ b/src/settings-mapper.spec.ts
+@@ -1,1 +1,1 @@
+-it("maps")
++it("maps the language")
+`
+	var model tea.Model = New(fakeSource{review}, &fakeSender{}, nil, "dark", config.Config{})
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: 60})
+	model, _ = model.Update(loadedMsg{gen: 1, review: review})
+
+	m, _ := press(model.(Model), "x")
+	view := ansi.Strip(m.View())
+	if strings.Contains(view, "settings-mapper.spec.ts") || !strings.Contains(view, "1 test file hidden") {
+		t.Errorf("the page still shows the test file:\n%s", view)
+	}
+	if !config.Load().HideTests {
+		t.Error("the setting to hide test files was not saved")
+	}
+
+	m, _ = press(m, "x")
+	if view := ansi.Strip(m.View()); !strings.Contains(view, "settings-mapper.spec.ts") {
+		t.Errorf("the page does not show the test file again:\n%s", view)
 	}
 }

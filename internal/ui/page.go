@@ -51,10 +51,11 @@ func (r row) sameLine(other row) bool {
 }
 
 // layoutPage lays out the review as rows that are at most width wide.
-// fileStarts holds the index of each file's first row. highlights holds the
+// fileStarts holds the index of each file's first row. hiddenTests counts the
+// test files that the page leaves out. highlights holds the
 // syntax colors of files. collapsed holds the paths of the files that show
 // only their title. descriptionExpanded shows the full pull request description.
-func layoutPage(review source.Review, files []diff.File, highlights []highlightedFile, width int, markdownStyle string, collapsed map[string]bool, descriptionExpanded bool) (rows []row, fileStarts []int) {
+func layoutPage(review source.Review, files []diff.File, hiddenTests int, highlights []highlightedFile, width int, markdownStyle string, collapsed map[string]bool, descriptionExpanded bool) (rows []row, fileStarts []int) {
 	addProse := func(text string) {
 		for _, line := range strings.Split(text, "\n") {
 			rows = append(rows, row{kind: proseRow, text: line, file: -1})
@@ -74,7 +75,14 @@ func layoutPage(review source.Review, files []diff.File, highlights []highlighte
 		addProse("")
 	}
 
-	addProse(renderHeading(fmt.Sprintf("Files changed (%d)", len(files)), width))
+	heading := fmt.Sprintf("Files changed (%d)", len(files))
+	switch {
+	case hiddenTests == 1:
+		heading = fmt.Sprintf("Files changed (%d, 1 test file hidden)", len(files))
+	case hiddenTests > 1:
+		heading = fmt.Sprintf("Files changed (%d, %d test files hidden)", len(files), hiddenTests)
+	}
+	addProse(renderHeading(heading, width))
 	if len(files) == 0 {
 		addProse("")
 		addProse(dimStyle.Render("No changes."))
