@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -13,7 +14,7 @@ func statusLine(block, id, state string) string {
 		block, id, state)
 }
 
-func TestWatchTurnsReportsEachStartOfWork(t *testing.T) {
+func TestWatchTurnsReportsEachStartAndEndOfWork(t *testing.T) {
 	events := strings.Join([]string{
 		statusLine("block:agent", "", "working"),
 		statusLine("block:agent", "", "working"), // a new progress message in the same turn
@@ -25,24 +26,34 @@ func TestWatchTurnsReportsEachStartOfWork(t *testing.T) {
 		statusLine("block:agent", "", "working"),
 	}, "\n")
 
-	turns := make(chan struct{}, 10)
+	turns := make(chan TurnEvent, 10)
 	watchTurns(strings.NewReader(events), "block:agent", false, turns)
+	close(turns)
 
-	if got := len(turns); got != 2 {
-		t.Errorf("got %d turns, want 2", got)
+	var got []TurnEvent
+	for event := range turns {
+		got = append(got, event)
+	}
+	if want := []TurnEvent{TurnStarted, TurnEnded, TurnStarted}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }
 
-func TestWatchTurnsSkipsTheTurnThatAlreadyRuns(t *testing.T) {
+func TestWatchTurnsEndsTheTurnThatAlreadyRuns(t *testing.T) {
 	events := strings.Join([]string{
 		statusLine("block:agent", "", "working"),
 		statusLine("block:agent", "", "idle"),
 	}, "\n")
 
-	turns := make(chan struct{}, 10)
+	turns := make(chan TurnEvent, 10)
 	watchTurns(strings.NewReader(events), "block:agent", true, turns)
+	close(turns)
 
-	if got := len(turns); got != 0 {
-		t.Errorf("got %d turns, want 0", got)
+	var got []TurnEvent
+	for event := range turns {
+		got = append(got, event)
+	}
+	if want := []TurnEvent{TurnEnded}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }

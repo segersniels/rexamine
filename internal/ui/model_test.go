@@ -393,7 +393,7 @@ func TestUpdateNoticeWrapsInNarrowScreens(t *testing.T) {
 }
 
 func TestTurnWithoutEditsKeepsThePreviousTurnStart(t *testing.T) {
-	var model tea.Model = New(source.Local{}, &fakeSender{}, make(chan struct{}), "dark")
+	var model tea.Model = New(source.Local{}, &fakeSender{}, make(chan agent.TurnEvent), "dark")
 
 	// Each snapshot is the working tree at the start of a turn. The second turn changes nothing.
 	for _, tree := range []string{"first", "second", "second"} {
@@ -403,6 +403,30 @@ func TestTurnWithoutEditsKeepsThePreviousTurnStart(t *testing.T) {
 	local := model.(Model).source.(source.Local)
 	if local.TurnStart != "second" || local.PreviousTurnStart != "first" {
 		t.Errorf("got turn start %q and previous %q, want second and first", local.TurnStart, local.PreviousTurnStart)
+	}
+}
+
+func TestTurnEventsTrackTheAgentsTurn(t *testing.T) {
+	turns := make(chan agent.TurnEvent)
+	var model tea.Model = New(source.Local{}, &fakeSender{}, turns, "dark")
+
+	// rexdiff opened while the agent worked, so it saves the working tree from now.
+	model, cmd := model.Update(turnMsg{agent.TurnJoined})
+	local := model.(Model).source.(source.Local)
+	if !local.JoinedTurn || local.TurnStartedAt.IsZero() || cmd == nil {
+		t.Fatalf("got %+v, want a joined turn that saves a snapshot", local)
+	}
+
+	model, _ = model.Update(turnMsg{agent.TurnEnded})
+	local = model.(Model).source.(source.Local)
+	if local.TurnEndedAt.IsZero() {
+		t.Error("the end of the turn was not saved")
+	}
+
+	model, _ = model.Update(turnMsg{agent.TurnStarted})
+	local = model.(Model).source.(source.Local)
+	if local.JoinedTurn || !local.TurnEndedAt.IsZero() {
+		t.Errorf("got %+v, want a new turn that runs", local)
 	}
 }
 
@@ -603,7 +627,7 @@ func TestReviewerChipsShowEachReviewerOnce(t *testing.T) {
 }
 
 func TestSwitchKeyMovesBetweenThePullRequestAndTheLocalChanges(t *testing.T) {
-	var model tea.Model = New(source.PullRequest{Target: "12"}, &fakeSender{}, make(chan struct{}), "dark")
+	var model tea.Model = New(source.PullRequest{Target: "12"}, &fakeSender{}, make(chan agent.TurnEvent), "dark")
 
 	m, cmd := press(model.(Model), "p")
 	local, ok := m.source.(source.Local)

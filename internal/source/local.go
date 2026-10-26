@@ -60,6 +60,17 @@ type Local struct {
 	// PreviousTurnStart is the snapshot from the start of the last turn before
 	// the latest one that changed files, or empty if there was none.
 	PreviousTurnStart string
+
+	// TurnStartedAt is when the agent started its latest turn, or when
+	// rexdiff opened during a turn.
+	TurnStartedAt time.Time
+
+	// TurnEndedAt is when the latest turn ended, or zero while the agent works.
+	TurnEndedAt time.Time
+
+	// JoinedTurn is set when rexdiff opened while the agent worked. TurnStart
+	// then holds the working tree from that moment, not from the start of the turn.
+	JoinedTurn bool
 }
 
 // Load runs git and returns the changes in the scope.
@@ -135,11 +146,12 @@ func (l Local) loadLastTurn(root, branch string) (Review, error) {
 		Context: filepath.Base(root),
 		Title:   "Last agent turn on " + branch,
 		Base:    "turn start",
-		Head:    "working tree",
+		Head:    "working tree · " + l.turnProgress(),
 	}
 
 	waiting := review
 	waiting.Title = "No agent changes yet on " + branch
+	waiting.Head = "working tree · waiting for the next turn"
 
 	// Before the first turn there is nothing to compare, so the page shows no changes.
 	if l.TurnStart == "" {
@@ -160,11 +172,29 @@ func (l Local) loadLastTurn(root, branch string) (Review, error) {
 		return waiting, nil
 	}
 
+	// A joined turn compares with the working tree from when rexdiff opened.
+	if base == l.TurnStart && l.JoinedTurn {
+		review.Base = "rexdiff opened"
+	}
+
 	review.Diff, err = git(root, "diff", "--no-color", "--no-ext-diff", "-M", base, now)
 	if err != nil {
 		return Review{}, err
 	}
 	return review, nil
+}
+
+// turnProgress describes the agent's latest turn, such as "agent working, started 3m ago".
+func (l Local) turnProgress() string {
+	if !l.TurnEndedAt.IsZero() {
+		return "turn ended " + TimeAgo(l.TurnEndedAt)
+	}
+
+	// rexdiff does not know when a joined turn started.
+	if l.JoinedTurn {
+		return "agent working"
+	}
+	return "agent working, started " + TimeAgo(l.TurnStartedAt)
 }
 
 // Snapshot saves the working tree of the repository in dir, or in the working

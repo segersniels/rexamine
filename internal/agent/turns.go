@@ -34,10 +34,26 @@ type statusEvent struct {
 	} `json:"payload"`
 }
 
-// WatchTurns reports each time the agent in the pane starts a turn. It follows
-// the status that the agent reports to Rex, such as Claude Code's "working".
-// The channel closes when the event stream ends or ctx is canceled.
-func (p RexPane) WatchTurns(ctx context.Context) (<-chan struct{}, error) {
+// TurnEvent is a change in the work of the agent.
+type TurnEvent int
+
+// The turn events.
+const (
+	// TurnStarted reports that the agent started a turn.
+	TurnStarted TurnEvent = iota
+
+	// TurnJoined reports that the agent already worked when the watch
+	// started, so the start of its turn is unknown.
+	TurnJoined
+
+	// TurnEnded reports that the agent finished its turn.
+	TurnEnded
+)
+
+// WatchTurns reports each time the agent in the pane starts or ends a turn.
+// It follows the status that the agent reports to Rex, such as Claude Code's
+// "working". The channel closes when the event stream ends or ctx is canceled.
+func (p RexPane) WatchTurns(ctx context.Context) (<-chan TurnEvent, error) {
 	cmd := exec.CommandContext(ctx, "rex", "events", "-s", p.Session, "--json")
 	events, err := cmd.StdoutPipe()
 	if err != nil {
@@ -47,10 +63,14 @@ func (p RexPane) WatchTurns(ctx context.Context) (<-chan struct{}, error) {
 		return nil, err
 	}
 
-	// A turn that already runs has no snapshot from its start, so only the next turn counts.
-	busy := p.isWorking()
+	turns := make(chan TurnEvent, 1)
 
-	turns := make(chan struct{}, 1)
+	// A turn that already runs has no snapshot from its start, so the review joins it from now.
+	busy := p.isWorking()
+	if busy {
+		turns <- TurnJoined
+	}
+
 	go func() {
 		defer close(turns)
 		watchTurns(events, p.Block, busy, turns)
@@ -84,9 +104,9 @@ func (p RexPane) isWorking() bool {
 }
 
 // watchTurns reads Rex events and sends on turns when the agent in block
-// starts to work. The agent repeats "working" with a new message as it
-// progresses, so only the change into "working" starts a turn.
-func watchTurns(events io.Reader, block string, busy bool, turns chan<- struct{}) {
+// starts or stops work. The agent repeats "working" with a new message as it
+// progresses, so only a change into or out of "working" counts.
+func watchTurns(events io.Reader, block string, busy bool, turns chan<- TurnEvent) {
 	lines := bufio.NewScanner(events)
 	lines.Buffer(nil, 1<<20)
 	for lines.Scan() {
@@ -100,16 +120,16 @@ func watchTurns(events io.Reader, block string, busy bool, turns chan<- struct{}
 			continue
 		}
 
-		started := change.Status.Record.State == working && !busy
-		busy = change.Status.Record.State == working
-		if !started {
+		nowWorking := change.Status.Record.State == working
+		if nowWorking == busy {
 			continue
 		}
+		busy = nowWorking
 
-		// The review needs only the latest turn, so a turn that the UI did not take yet is enough.
-		select {
-		case turns <- struct{}{}:
-		default:
+		if nowWorking {
+			turns <- TurnStarted
+		} else {
+			turns <- TurnEnded
 		}
 	}
 }

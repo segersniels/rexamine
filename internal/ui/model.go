@@ -60,9 +60,9 @@ type (
 		review source.Review
 		err    error
 	}
-	watchMsg       struct{ gen int }
-	turnStartedMsg struct{}
-	snapshotMsg    struct {
+	watchMsg    struct{ gen int }
+	turnMsg     struct{ event agent.TurnEvent }
+	snapshotMsg struct {
 		tree string
 		err  error
 	}
@@ -103,8 +103,8 @@ type Model struct {
 	sender        agent.Sender
 	markdownStyle string
 
-	// turns reports when the agent starts a turn, or is nil without an agent to watch.
-	turns <-chan struct{}
+	// turns reports when the agent starts or ends a turn, or is nil without an agent to watch.
+	turns <-chan agent.TurnEvent
 
 	keys        browseKeys
 	composeKeys composeKeys
@@ -169,7 +169,7 @@ type Model struct {
 // New creates the review screen. Comments go to the sender. turns reports when
 // the agent starts a turn, or is nil without an agent to watch. markdownStyle
 // is a glamour style name, such as "dark".
-func New(src source.Source, sender agent.Sender, turns <-chan struct{}, markdownStyle string) Model {
+func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, markdownStyle string) Model {
 	composer := textarea.New()
 	composer.ShowLineNumbers = false
 	composer.Prompt = ""
@@ -278,8 +278,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.reload()
 
-	case turnStartedMsg:
-		return m, tea.Batch(takeSnapshot(m.localSource().Dir), waitForTurn(m.turns))
+	case turnMsg:
+		local := m.localSource()
+		if msg.event == agent.TurnEnded {
+			local.TurnEndedAt = time.Now()
+			return m.updateLocalSource(local, waitForTurn(m.turns))
+		}
+
+		local.TurnStartedAt, local.TurnEndedAt = time.Now(), time.Time{}
+		local.JoinedTurn = msg.event == agent.TurnJoined
+		return m.updateLocalSource(local, takeSnapshot(local.Dir), waitForTurn(m.turns))
 
 	case snapshotMsg:
 		if msg.err != nil {
@@ -292,18 +300,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			local.PreviousTurnStart = local.TurnStart
 		}
 		local.TurnStart = msg.tree
-
-		// The pull request shows now, so the snapshot waits for a switch back to the local changes.
-		if _, showing := m.source.(source.Local); !showing {
-			m.other = local
-			return m, nil
-		}
-
-		m.source = local
-		if local.Scope != source.LastTurn {
-			return m, nil
-		}
-		return m, m.reload()
+		return m.updateLocalSource(local)
 
 	case spinner.TickMsg:
 		if !m.loading {
@@ -408,8 +405,8 @@ func (m Model) handleLoaded(msg loadedMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Watch checks find no change most of the time, so keep the page as it is.
-	unchanged := m.review != nil && msg.review.PullRequest == nil &&
-		msg.review.Title == m.review.Title && msg.review.Diff == m.review.Diff
+	unchanged := m.review != nil && msg.review.PullRequest == nil && msg.review.Title == m.review.Title &&
+		msg.review.Base == m.review.Base && msg.review.Head == m.review.Head && msg.review.Diff == m.review.Diff
 	if unchanged {
 		return m, watch
 	}
@@ -560,6 +557,22 @@ func (m Model) switchSource() (tea.Model, tea.Cmd) {
 		return m, tea.Batch(findCheckout(local.Dir, branch, m.loadGen), m.spinner.Tick)
 	}
 	return m, tea.Batch(m.reload(), m.spinner.Tick)
+}
+
+// updateLocalSource stores a change to the turn of the local changes, and
+// shows it when the last turn shows now. It runs cmds beside the reload.
+func (m Model) updateLocalSource(local source.Local, cmds ...tea.Cmd) (tea.Model, tea.Cmd) {
+	// The pull request shows now, so the change waits for a switch back to the local changes.
+	if _, showing := m.source.(source.Local); !showing {
+		m.other = local
+		return m, tea.Batch(cmds...)
+	}
+
+	m.source = local
+	if local.Scope != source.LastTurn {
+		return m, tea.Batch(cmds...)
+	}
+	return m, tea.Batch(append(cmds, m.reload())...)
 }
 
 // localSource returns the local changes, whether they show now or wait
@@ -1255,14 +1268,15 @@ func loadReview(src source.Source, gen int) tea.Cmd {
 	}
 }
 
-// waitForTurn waits in the background until the agent starts a turn. When the
-// watch ends, it returns no message, so the UI stops waiting.
-func waitForTurn(turns <-chan struct{}) tea.Cmd {
+// waitForTurn waits in the background until the agent starts or ends a turn.
+// When the watch ends, it returns no message, so the UI stops waiting.
+func waitForTurn(turns <-chan agent.TurnEvent) tea.Cmd {
 	return func() tea.Msg {
-		if _, ok := <-turns; !ok {
+		event, ok := <-turns
+		if !ok {
 			return nil
 		}
-		return turnStartedMsg{}
+		return turnMsg{event}
 	}
 }
 

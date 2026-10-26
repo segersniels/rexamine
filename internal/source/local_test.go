@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // newRepo creates a repository with one commit on main and a feature branch
@@ -262,5 +263,41 @@ func TestLastTurnWithoutEditsKeepsThePreviousTurnInView(t *testing.T) {
 	}
 	if !strings.Contains(review.Diff, "b/second.txt") || strings.Contains(review.Diff, "agent.txt") {
 		t.Errorf("diff does not show only the latest turn's change:\n%s", review.Diff)
+	}
+}
+
+func TestLastTurnHeaderShowsTheStateOfTheTurn(t *testing.T) {
+	t.Chdir(newRepo(t))
+
+	start, err := Snapshot("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("agent.txt", []byte("agent\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name     string
+		local    Local
+		wantBase string
+		wantHead string
+	}{
+		{"before the first turn", Local{}, "turn start", "working tree · waiting for the next turn"},
+		{"working", Local{TurnStart: start, TurnStartedAt: time.Now().Add(-3 * time.Minute)}, "turn start", "working tree · agent working, started 3m ago"},
+		{"joined", Local{TurnStart: start, TurnStartedAt: time.Now(), JoinedTurn: true}, "rexdiff opened", "working tree · agent working"},
+		{"ended", Local{TurnStart: start, TurnEndedAt: time.Now()}, "turn start", "working tree · turn ended just now"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.local.Scope = LastTurn
+			review, err := tt.local.Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if review.Base != tt.wantBase || review.Head != tt.wantHead {
+				t.Errorf("got %q ← %q, want %q ← %q", review.Base, review.Head, tt.wantBase, tt.wantHead)
+			}
+		})
 	}
 }

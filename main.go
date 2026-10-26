@@ -114,7 +114,7 @@ func run() int {
 	defer cancel()
 
 	var sender agent.Sender = agent.Clipboard{}
-	var turns <-chan struct{}
+	var turns <-chan agent.TurnEvent
 	if *agentPane != "" {
 		pane := agent.RexPane{Session: os.Getenv("REX_SESSION"), Block: *agentPane}
 		sender = pane
