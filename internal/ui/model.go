@@ -706,6 +706,11 @@ func (m Model) updateComposer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case key.Matches(msg, m.composeKeys.SendNow):
+		text := agent.Format(m.snippet, m.composer.Value())
+		m.endComment()
+		return m, submit(m.sender.(agent.Submitter), text)
+
 	case key.Matches(msg, m.composeKeys.Send) && m.destination == toPullRequest:
 		body := strings.TrimSpace(m.composer.Value())
 
@@ -1060,6 +1065,10 @@ func (m *Model) startComment() tea.Cmd {
 func (m *Model) setDestination(d destination) {
 	m.destination = d
 	agentTarget := m.sender.Target()
+
+	// Only an agent pane can submit a comment. GitHub and the clipboard have nothing to submit to.
+	_, submits := m.sender.(agent.Submitter)
+	m.composeKeys.SendNow.SetEnabled(d == toAgent && submits)
 
 	if d == toPullRequest {
 		m.composer.Placeholder = "Write a review comment for GitHub…"
@@ -1465,6 +1474,13 @@ func findCheckout(dir, branch string, gen int) tea.Cmd {
 // send delivers a comment in the background.
 func send(sender agent.Sender, text string) tea.Cmd {
 	return func() tea.Msg { return sentMsg{sender.Send(text), "Sent to " + sender.Target()} }
+}
+
+// submit delivers a comment and submits it in the background.
+func submit(submitter agent.Submitter, text string) tea.Cmd {
+	return func() tea.Msg {
+		return sentMsg{submitter.Submit(text), "Submitted to " + submitter.Target()}
+	}
 }
 
 // postComment posts a review comment on the pull request in the background.

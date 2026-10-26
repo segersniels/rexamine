@@ -62,6 +62,7 @@ rexdiff uses these parts of Rex:
 | Part                      | Used for                                                        |
 | ------------------------- | --------------------------------------------------------------- |
 | `rex api call block.event` | Paste a comment into the agent's pane.                         |
+| `rex send-key` and `rex focus` | Submit a comment with `ctrl+s`, and focus the agent's pane. |
 | The Lua configuration API | The `rexdiff` action and its key: `rex.action`, `rex.bind`, `rex.session.new_split`, `rex.session.view`, `rex.block.call`, and `rex.call`. |
 | `rex do rexdiff`          | Open the pane from the agent skill.                             |
 | `rex config reload`       | Load the module after `rexdiff setup`.                          |

@@ -54,7 +54,7 @@ When rexdiff runs in a pane beside an agent in Rex, it follows the status that t
 
 ## Comments
 
-The comment box opens below the selected lines. In it, `enter` sends the comment, `alt+enter` starts a new line, and `esc` cancels. A click elsewhere on the page also cancels.
+The comment box opens below the selected lines. In it, `enter` sends the comment, `alt+enter` starts a new line, and `esc` cancels. With an agent pane, `ctrl+s` sends the comment, submits it, and focuses the agent pane, so the agent answers at once. A click elsewhere on the page also cancels.
 
 Where a comment goes depends on how rexdiff runs. The bottom border of the comment box shows it:
 
@@ -63,7 +63,7 @@ Where a comment goes depends on how rexdiff runs. The bottom border of the comme
 | In a pane beside an agent                | The agent       | The agent or GitHub. `shift+tab` switches.   |
 | Without an agent pane, such as `rexdiff` | The clipboard   | GitHub                                       |
 
-- **The agent**: rexdiff pastes the comment into the agent's pane as a real paste, so the agent waits for you to submit.
+- **The agent**: rexdiff pastes the comment into the agent's pane as a real paste, so the agent waits for you to submit. `ctrl+s` submits the comment at once and focuses the agent pane.
 - **GitHub**: rexdiff posts the comment on the selected lines of the pull request at once, as your GitHub account. The box border changes color to show it. rexdiff keeps the choice for the next comment.
 - **The clipboard**: paste the comment into any agent yourself.
 

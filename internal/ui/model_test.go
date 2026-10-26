@@ -33,11 +33,16 @@ type fakeSource struct{ review source.Review }
 
 func (f fakeSource) Load() (source.Review, error) { return f.review, nil }
 
-// fakeSender records what it is asked to send.
-type fakeSender struct{ sent []string }
+// fakeSender records what it is asked to send or submit.
+type fakeSender struct{ sent, submitted []string }
 
 func (f *fakeSender) Send(text string) error {
 	f.sent = append(f.sent, text)
+	return nil
+}
+
+func (f *fakeSender) Submit(text string) error {
+	f.submitted = append(f.submitted, text)
 	return nil
 }
 
@@ -83,6 +88,8 @@ func press(m Model, keys ...string) (Model, tea.Cmd) {
 			msg = tea.KeyMsg{Type: tea.KeyEnter}
 		case "esc":
 			msg = tea.KeyMsg{Type: tea.KeyEsc}
+		case "ctrl+s":
+			msg = tea.KeyMsg{Type: tea.KeyCtrlS}
 		case "shift+tab":
 			msg = tea.KeyMsg{Type: tea.KeyShiftTab}
 		case "down":
@@ -141,6 +148,33 @@ func TestCommentOnSelectedLinesSendsThemToTheAgent(t *testing.T) {
 	}
 	if m.mode != browsing || m.anchor != -1 {
 		t.Error("sending did not close the composer and clear the selection")
+	}
+}
+
+func TestSendNowKeySubmitsTheCommentToTheAgent(t *testing.T) {
+	sender := &fakeSender{}
+	m := newLoadedModel(t, sender, 50, 60)
+
+	m, _ = press(m, "]", "j", "j", "j", "c", "W", "h", "y", "?")
+	m, cmd := press(m, "ctrl+s")
+	if cmd == nil {
+		t.Fatal("ctrl+s did not submit the comment")
+	}
+	cmd()
+
+	want := "src/settings-mapper.ts L2:\n```diff\n   type Language,\n```\nWhy?\n\n"
+	if len(sender.submitted) != 1 || sender.submitted[0] != want || len(sender.sent) != 0 {
+		t.Errorf("submitted %q and sent %q, want only %q submitted", sender.submitted, sender.sent, want)
+	}
+	if m.mode != browsing {
+		t.Error("submitting did not close the composer")
+	}
+}
+
+func TestSendNowKeyIsOffWithoutAnAgentPane(t *testing.T) {
+	var model tea.Model = New(source.Local{}, agent.Clipboard{}, nil, "dark", config.Config{})
+	if model.(Model).composeKeys.SendNow.Enabled() {
+		t.Error("ctrl+s is on, but the clipboard cannot submit a comment")
 	}
 }
 

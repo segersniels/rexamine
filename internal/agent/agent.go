@@ -80,6 +80,13 @@ type Sender interface {
 	Target() string
 }
 
+// Submitter is a Sender that can also submit the text, so the agent starts on
+// it at once instead of waiting for the user.
+type Submitter interface {
+	Sender
+	Submit(text string) error
+}
+
 // RexPane pastes text into a Rex terminal pane, such as one that runs Claude
 // Code. The agent receives a real paste, so the text waits in its prompt
 // until the user submits it.
@@ -113,14 +120,33 @@ func (p RexPane) paste(text string) error {
 		return err
 	}
 
-	args := []string{"api", "call"}
+	cmd := p.rex("api", "call", "block.event", "-")
+	cmd.Stdin = bytes.NewReader(request)
+	return run(cmd)
+}
+
+// Submit pastes the text into the pane, presses enter to submit it, and
+// focuses the pane, so the user sees the agent answer.
+func (p RexPane) Submit(text string) error {
+	if err := p.paste(text); err != nil {
+		return err
+	}
+	if err := run(p.rex("send-key", "-b", p.Block, "enter")); err != nil {
+		return err
+	}
+	return run(p.rex("focus", p.Block))
+}
+
+// rex builds a rex command that acts on the pane's session.
+func (p RexPane) rex(args ...string) *exec.Cmd {
 	if p.Session != "" {
 		args = append(args, "-s", p.Session)
 	}
-	args = append(args, "block.event", "-")
+	return exec.Command("rex", args...)
+}
 
-	cmd := exec.Command("rex", args...)
-	cmd.Stdin = bytes.NewReader(request)
+// run runs a rex command and returns its output as the error when it fails.
+func run(cmd *exec.Cmd) error {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		message := strings.TrimSpace(string(out))
 

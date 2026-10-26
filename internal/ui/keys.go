@@ -58,7 +58,7 @@ func (k browseKeys) FullHelp() [][]key.Binding {
 
 // composeKeys holds the keys for writing a comment.
 type composeKeys struct {
-	Send, Cycle, Newline, Cancel key.Binding
+	Send, SendNow, Cycle, Newline, Cancel key.Binding
 }
 
 // newComposeKeys creates the composer keys. The model sets the help of Send,
@@ -67,6 +67,7 @@ type composeKeys struct {
 func newComposeKeys() composeKeys {
 	return composeKeys{
 		Send:    key.NewBinding(key.WithKeys("enter")),
+		SendNow: key.NewBinding(key.WithKeys("ctrl+s"), key.WithHelp("ctrl+s", "send and submit")),
 		Cycle:   key.NewBinding(key.WithKeys("shift+tab")),
 		Newline: key.NewBinding(key.WithKeys("alt+enter", "ctrl+j"), key.WithHelp("alt+enter", "new line")),
 		Cancel:  key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
@@ -75,7 +76,7 @@ func newComposeKeys() composeKeys {
 
 // ShortHelp lists the composer keys for the footer.
 func (k composeKeys) ShortHelp() []key.Binding {
-	return []key.Binding{k.Send, k.Newline, k.Cancel}
+	return []key.Binding{k.Send, k.SendNow, k.Newline, k.Cancel}
 }
 
 // FullHelp lists the composer keys in one column.
