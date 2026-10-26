@@ -3,6 +3,7 @@
 package setup
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -54,6 +55,61 @@ func Run(files Files, opts Options) error {
 		}
 	}
 	return nil
+}
+
+// Refresh rewrites the installed Rex module and agent skills that differ from
+// the files in this binary, so an update that does not run `rexdiff setup`
+// still brings them up to date. It only touches files that setup installed,
+// and reloads Rex when the module changed.
+func Refresh(files Files) error {
+	initPath, err := rexInitPath()
+	if err != nil {
+		return err
+	}
+
+	moduleChanged, err := refreshFile(filepath.Join(filepath.Dir(initPath), "rexdiff.lua"), files.RexModule)
+	if err != nil {
+		return err
+	}
+
+	agents, err := knownAgents()
+	if err != nil {
+		return err
+	}
+
+	// Agents that share a skills directory share one copy of the skill.
+	seen := map[string]bool{}
+	for _, a := range agents {
+		if seen[a.skillsDir] {
+			continue
+		}
+		seen[a.skillsDir] = true
+
+		if _, err := refreshFile(filepath.Join(a.skillsDir, "rexdiff", "SKILL.md"), files.Skill); err != nil {
+			return err
+		}
+	}
+
+	if moduleChanged {
+		reloadRex(io.Discard)
+	}
+	return nil
+}
+
+// refreshFile replaces the file at path with content when the file exists and
+// differs, and reports whether it changed the file.
+func refreshFile(path string, content []byte) (bool, error) {
+	current, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if bytes.Equal(current, content) {
+		return false, nil
+	}
+	return true, os.WriteFile(path, content, 0o644)
 }
 
 // installRex writes the Rex module next to init.lua, makes init.lua load it,

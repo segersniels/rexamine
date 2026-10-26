@@ -106,6 +106,10 @@ func run() int {
 		return 1
 	}
 
+	// An update without `rexdiff setup` leaves the old module and skill behind, so each start brings them
+	// up to date. A failure only leaves the old files, which `rexdiff setup` can fix, so the screen still opens.
+	_ = setup.Refresh(setup.Files{RexModule: rexModule, Skill: skill})
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

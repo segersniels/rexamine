@@ -220,3 +220,43 @@ func TestRemoveSetupCall(t *testing.T) {
 		})
 	}
 }
+
+func TestRefreshUpdatesOnlyInstalledFiles(t *testing.T) {
+	dir := useTempConfig(t)
+	installAgents(t, filepath.Join(dir, "claude"), filepath.Join(dir, ".cursor"))
+	if err := Run(Files{RexModule: []byte("-- old\n"), Skill: []byte("# old\n")}, Options{Rex: true, Skill: true, Out: &bytes.Buffer{}}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Cursor's skill was removed by hand, so the refresh must not bring it back.
+	cursorSkill := filepath.Join(dir, ".cursor", "skills", "rexdiff", "SKILL.md")
+	if err := os.Remove(cursorSkill); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Refresh(testFiles); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := readFile(t, filepath.Join(dir, "config", "rex", "rexdiff.lua")); got != string(testFiles.RexModule) {
+		t.Errorf("module is %q, want the new module", got)
+	}
+	if got := readFile(t, filepath.Join(dir, "claude", "skills", "rexdiff", "SKILL.md")); got != string(testFiles.Skill) {
+		t.Errorf("skill is %q, want the new skill", got)
+	}
+	if _, err := os.Stat(cursorSkill); err == nil {
+		t.Error("refresh installed a skill that the user removed")
+	}
+}
+
+func TestRefreshWithoutSetupInstallsNothing(t *testing.T) {
+	dir := useTempConfig(t)
+	installAgents(t, filepath.Join(dir, "claude"))
+
+	if err := Refresh(testFiles); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "config", "rex", "rexdiff.lua")); err == nil {
+		t.Error("refresh installed the module without setup")
+	}
+}
