@@ -150,6 +150,11 @@ func installRex(module []byte, opts Options) error {
 			return err
 		}
 		report(opts.Out, "Rex config", initPath)
+
+		// Rex finds rexdiff on PATH, but a pane does not get what ~/.zshrc adds to PATH.
+		if opts.Binary == "" {
+			_, _ = fmt.Fprintln(opts.Out, "  Rex starts rexdiff from a non-interactive shell, which does not read ~/.zshrc.\n  If the pane says \"command not found\", add the directory of rexdiff to PATH in ~/.zshenv.\n  See https://github.com/segersniels/rexdiff/blob/main/docs/install.md#put-rexdiff-on-the-path-that-rex-uses")
+		}
 	}
 
 	reloadRex(opts.Out)
