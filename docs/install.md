@@ -47,6 +47,33 @@ go install github.com/segersniels/rexdiff@latest
 
 You can also download an archive for your platform from the [latest release](https://github.com/segersniels/rexdiff/releases/latest). Each archive holds the `rexdiff` binary, the Rex module, and the agent skill.
 
+## Put rexdiff on the PATH that Rex uses
+
+Rex starts rexdiff from a non-interactive shell. That shell does not read `~/.zshrc`, so rexdiff can work in a normal pane, but the rexdiff pane says `command not found`. Add the directory of rexdiff to `PATH` in a file that every shell reads. For zsh, use `~/.zshenv`:
+
+```sh
+echo 'export PATH="/path/to/dir:$PATH"' >> ~/.zshenv
+```
+
+Find the directory with `dirname "$(command -v rexdiff)"`. It depends on how you installed rexdiff:
+
+| Install method | Directory                                                                             |
+| -------------- | ------------------------------------------------------------------------------------- |
+| Script         | `~/.local/bin`, or `REXDIFF_INSTALL_DIR`                                              |
+| npm            | The `bin` directory of npm's prefix: `"$(npm prefix -g)/bin"`. With a Node version manager, such as nvm or mise, it changes with the Node version. |
+| Go             | `"$(go env GOPATH)/bin"`, usually `~/go/bin`                                          |
+| Archive        | The directory where you put the binary                                                |
+
+Do this on each host where you run Rex sessions, such as a remote server. Rex starts the pane on the host of the session, so each host needs its own rexdiff.
+
+To check the setup, run rexdiff from a clean, non-interactive shell:
+
+```sh
+env -i HOME="$HOME" "$SHELL" -lc 'command -v rexdiff'
+```
+
+When this prints nothing, Rex cannot find rexdiff either.
+
 ## Add rexdiff to Rex
 
 ```sh
@@ -55,7 +82,7 @@ rexdiff setup
 
 `rexdiff setup` does three things:
 
-- It writes the Rex module to `~/.config/rex/rexdiff.lua` and loads it from `~/.config/rex/init.lua`, with the full path of the binary and the key `ctrl+alt+cmd+d`.
+- It writes the Rex module to `~/.config/rex/rexdiff.lua` and loads it from `~/.config/rex/init.lua` with the key `ctrl+alt+cmd+d`. When rexdiff is on your `PATH`, Rex starts it from there. If not, setup adds the full path of the binary.
 - It installs the agent skill for each coding agent that it finds. See [Agent skill](rex.md#agent-skill).
 - It reloads the Rex configuration.
 

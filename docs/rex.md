@@ -28,6 +28,10 @@ require("rexdiff").setup{
 }
 ```
 
+### The pane says "command not found"
+
+Rex starts rexdiff from a non-interactive shell, which does not read `~/.zshrc`. See [Put rexdiff on the PATH that Rex uses](install.md#put-rexdiff-on-the-path-that-rex-uses). You can also set `bin` to the full path, but Rex runs that path on the host of the session, so it fails on a host where the path does not exist.
+
 ## Agent skill
 
 The [`rexdiff` skill](../skills/rexdiff/SKILL.md) teaches an agent to open the pane and to read the comments that rexdiff sends. Ask the agent to open a pull request in rexdiff. In Claude Code, you can also run `/rexdiff <pr>`.
