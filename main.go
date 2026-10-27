@@ -13,8 +13,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2/compat"
 
 	"github.com/segersniels/rexdiff/internal/agent"
 	"github.com/segersniels/rexdiff/internal/config"
@@ -125,13 +125,13 @@ func run() int {
 		turns, _ = pane.WatchTurns(ctx)
 	}
 
-	// Ask for the background color before Bubble Tea takes over the terminal.
+	// The compat package asks for the background color at startup, before Bubble Tea takes over the terminal.
 	markdownStyle := "light"
-	if lipgloss.HasDarkBackground() {
+	if compat.HasDarkBackground {
 		markdownStyle = "dark"
 	}
 
-	program := tea.NewProgram(ui.New(src, sender, turns, markdownStyle, config.Load()), tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus())
+	program := tea.NewProgram(ui.New(src, sender, turns, markdownStyle, config.Load()))
 
 	// The check can wait on the network, so it runs beside the screen and never delays it.
 	go func() {

@@ -3,11 +3,11 @@ package ui
 import (
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/segersniels/rexdiff/internal/diff"
 )
@@ -191,21 +191,17 @@ func spansIn(spans []span, start, end int) []span {
 }
 
 // colorize renders spans in their colors. Each span resets only the text
-// color, so the background of the row stays intact.
+// color, so the background of the row stays intact. Bubble Tea lowers the
+// colors to what the terminal supports.
 func colorize(spans []span) string {
-	profile := lipgloss.ColorProfile()
-
 	var b strings.Builder
 	for _, s := range spans {
-		sequence := ""
-		if color := profile.Color(s.color); color != nil {
-			sequence = color.Sequence(false)
-		}
-		if sequence == "" {
+		if s.color == "" {
 			b.WriteString(s.text)
 			continue
 		}
-		b.WriteString(termenv.CSI + sequence + "m" + s.text + termenv.CSI + "39m")
+		color := ansi.NewStyle().ForegroundColor(lipgloss.Color(s.color)).String()
+		b.WriteString(color + s.text + ansi.NewStyle().ForegroundColor(nil).String())
 	}
 	return b.String()
 }

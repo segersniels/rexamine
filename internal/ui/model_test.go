@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/segersniels/rexdiff/internal/agent"
@@ -82,18 +82,18 @@ func press(m Model, keys ...string) (Model, tea.Cmd) {
 	var model tea.Model = m
 	var cmd tea.Cmd
 	for _, k := range keys {
-		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
+		msg := tea.KeyPressMsg{Code: []rune(k)[0], Text: k}
 		switch k {
 		case "enter":
-			msg = tea.KeyMsg{Type: tea.KeyEnter}
+			msg = tea.KeyPressMsg{Code: tea.KeyEnter}
 		case "esc":
-			msg = tea.KeyMsg{Type: tea.KeyEsc}
+			msg = tea.KeyPressMsg{Code: tea.KeyEsc}
 		case "ctrl+s":
-			msg = tea.KeyMsg{Type: tea.KeyCtrlS}
+			msg = tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}
 		case "shift+tab":
-			msg = tea.KeyMsg{Type: tea.KeyShiftTab}
+			msg = tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 		case "down":
-			msg = tea.KeyMsg{Type: tea.KeyDown}
+			msg = tea.KeyPressMsg{Code: tea.KeyDown}
 		}
 		model, cmd = model.Update(msg)
 	}
@@ -103,14 +103,14 @@ func press(m Model, keys ...string) (Model, tea.Cmd) {
 func TestViewFitsNarrowScreens(t *testing.T) {
 	for _, width := range []int{24, 40, 60, 100} {
 		m := newLoadedModel(t, &fakeSender{}, width, 200)
-		browsing := m.View()
+		browsing := m.View().Content
 
 		m, _ = press(m, "]", "j", "j", "j", "c")
 		if m.mode != composing {
 			t.Fatalf("width %d: comment box did not open", width)
 		}
 
-		for _, view := range []string{browsing, m.View()} {
+		for _, view := range []string{browsing, m.View().Content} {
 			for i, line := range strings.Split(view, "\n") {
 				if got := ansi.StringWidth(line); got > width {
 					t.Errorf("width %d: line %d is %d columns wide: %q", width, i+1, got, ansi.Strip(line))
@@ -126,7 +126,7 @@ func TestCommentOnSelectedLinesSendsThemToTheAgent(t *testing.T) {
 
 	// Go to the file, then down past its title and hunk header to "type Language".
 	m, _ = press(m, "]", "j", "j", "j")
-	if r := m.rows[m.cursor]; r.kind != codeRow || !strings.Contains(r.text, "type Language") {
+	if r := m.rows[m.cursor]; r.kind != codeRow || !strings.Contains(ansi.Strip(r.text), "type Language") {
 		t.Fatalf("cursor is on %q, want the type Language line", ansi.Strip(r.text))
 	}
 
@@ -215,9 +215,9 @@ func TestResizeKeepsTheCursorOnTheSameLine(t *testing.T) {
 	}
 }
 
-// mouse sends a left-button event at a screen position.
-func mouse(m Model, action tea.MouseAction, x, y int) Model {
-	model, _ := m.Update(tea.MouseMsg{X: x, Y: y, Action: action, Button: tea.MouseButtonLeft})
+// mouse sends a mouse event to the model.
+func mouse(m Model, msg tea.MouseMsg) Model {
+	model, _ := m.Update(msg)
 	return model.(Model)
 }
 
@@ -238,9 +238,9 @@ func TestMouseDragOpensTheCommentBoxBelowTheSelection(t *testing.T) {
 	m, _ = press(m, "]")
 
 	from, to := screenY(t, m, "type Language"), screenY(t, m, "matchLanguage")
-	m = mouse(m, tea.MouseActionPress, 10, from)
-	m = mouse(m, tea.MouseActionMotion, 10, to)
-	m = mouse(m, tea.MouseActionRelease, 10, to)
+	m = mouse(m, tea.MouseClickMsg{X: 10, Y: from, Button: tea.MouseLeft})
+	m = mouse(m, tea.MouseMotionMsg{X: 10, Y: to, Button: tea.MouseLeft})
+	m = mouse(m, tea.MouseReleaseMsg{X: 10, Y: to, Button: tea.MouseLeft})
 
 	if m.mode != composing {
 		t.Fatal("releasing a drag did not open the comment box")
@@ -254,7 +254,7 @@ func TestMouseDragOpensTheCommentBoxBelowTheSelection(t *testing.T) {
 	if lines[to].row != -1 || !strings.Contains(ansi.Strip(lines[to].text), "settings-mapper.ts L2-L3") {
 		t.Errorf("line below the selection is %q, want the comment box title", ansi.Strip(lines[to].text))
 	}
-	for i, line := range strings.Split(m.View(), "\n") {
+	for i, line := range strings.Split(m.View().Content, "\n") {
 		if got := ansi.StringWidth(line); got > 60 {
 			t.Errorf("line %d is %d columns wide: %q", i+1, got, ansi.Strip(line))
 		}
@@ -266,8 +266,8 @@ func TestClickOnALineNumberOpensTheCommentBox(t *testing.T) {
 	m, _ = press(m, "]")
 
 	y := screenY(t, m, "type Language")
-	m = mouse(m, tea.MouseActionPress, 1, y)
-	m = mouse(m, tea.MouseActionRelease, 1, y)
+	m = mouse(m, tea.MouseClickMsg{X: 1, Y: y, Button: tea.MouseLeft})
+	m = mouse(m, tea.MouseReleaseMsg{X: 1, Y: y, Button: tea.MouseLeft})
 
 	if m.mode != composing || m.snippet.Location() != "L2" {
 		t.Errorf("mode %v, location %q; want the comment box for L2", m.mode, m.snippet.Location())
@@ -279,13 +279,13 @@ func TestClickOnCodeOnlyMovesTheCursor(t *testing.T) {
 	m, _ = press(m, "]")
 
 	y := screenY(t, m, "type Language")
-	m = mouse(m, tea.MouseActionPress, 20, y)
-	m = mouse(m, tea.MouseActionRelease, 20, y)
+	m = mouse(m, tea.MouseClickMsg{X: 20, Y: y, Button: tea.MouseLeft})
+	m = mouse(m, tea.MouseReleaseMsg{X: 20, Y: y, Button: tea.MouseLeft})
 
 	if m.mode == composing || m.anchor != -1 {
 		t.Error("a click on the code opened the comment box")
 	}
-	if !strings.Contains(m.rows[m.cursor].text, "type Language") {
+	if !strings.Contains(ansi.Strip(m.rows[m.cursor].text), "type Language") {
 		t.Errorf("cursor is on %q, want the clicked line", ansi.Strip(m.rows[m.cursor].text))
 	}
 }
@@ -322,8 +322,8 @@ func TestClickOnAFileTitleCollapsesTheFile(t *testing.T) {
 	m := newLoadedModel(t, &fakeSender{}, 60, 60)
 
 	y := screenY(t, m, "settings-mapper.ts")
-	m = mouse(m, tea.MouseActionPress, 10, y)
-	m = mouse(m, tea.MouseActionRelease, 10, y)
+	m = mouse(m, tea.MouseClickMsg{X: 10, Y: y, Button: tea.MouseLeft})
+	m = mouse(m, tea.MouseReleaseMsg{X: 10, Y: y, Button: tea.MouseLeft})
 
 	if hasCodeRows(m) || m.mode == composing {
 		t.Error("a click on the file title did not collapse the file")
@@ -392,8 +392,8 @@ func TestClickOnMoreLinesExpandsTheDescription(t *testing.T) {
 	m := newLongDescriptionModel(t)
 
 	y := screenY(t, m, "more lines")
-	m = mouse(m, tea.MouseActionPress, 5, y)
-	m = mouse(m, tea.MouseActionRelease, 5, y)
+	m = mouse(m, tea.MouseClickMsg{X: 5, Y: y, Button: tea.MouseLeft})
+	m = mouse(m, tea.MouseReleaseMsg{X: 5, Y: y, Button: tea.MouseLeft})
 
 	if !strings.Contains(pageText(m), "The last paragraph.") {
 		t.Error("a click on the more lines row did not expand the description")
@@ -413,7 +413,7 @@ func TestUpdateNoticeWrapsInNarrowScreens(t *testing.T) {
 	for _, width := range []int{24, 40, 200} {
 		var model tea.Model = newLoadedModel(t, &fakeSender{}, width, 60)
 		model, _ = model.Update(notice)
-		view := model.View()
+		view := model.View().Content
 
 		if !strings.Contains(ansi.Strip(view), "rexdiff 9.9.9") {
 			t.Errorf("width %d: view does not show the notice", width)
@@ -478,7 +478,7 @@ func TestShiftTabSwitchesAPullRequestCommentToGitHub(t *testing.T) {
 	if footer := ansi.Strip(m.footerView()); !strings.Contains(footer, "comment on GitHub") {
 		t.Errorf("footer %q does not say that the comment goes to GitHub", footer)
 	}
-	if view := ansi.Strip(m.View()); !strings.Contains(view, "╰─ comment (shift+tab to cycle) ─") {
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "╰─ comment (shift+tab to cycle) ─") {
 		t.Errorf("the comment box border does not show the destination and the key:\n%s", view)
 	}
 
@@ -538,7 +538,7 @@ func TestPullRequestWithoutAnAgentOnlyCommentsOnGitHub(t *testing.T) {
 	if m.destination != toPullRequest {
 		t.Error("the comment does not go to GitHub")
 	}
-	if view := ansi.Strip(m.View()); !strings.Contains(view, "╰─ comment ─") {
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "╰─ comment ─") {
 		t.Errorf("the comment box border does not say comment without a hint:\n%s", view)
 	}
 }
@@ -559,7 +559,7 @@ func TestWorktreePickerSwitchesToTheChosenBranch(t *testing.T) {
 	}
 
 	// Rows name the branch, not the directory, and the tags say which checkout is which.
-	view := ansi.Strip(m.View())
+	view := ansi.Strip(m.View().Content)
 	for _, want := range []string{"main", "current · main", "feat/a-branch", "0123456", "detached"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("picker does not show %q:\n%s", want, view)
@@ -568,7 +568,7 @@ func TestWorktreePickerSwitchesToTheChosenBranch(t *testing.T) {
 	if strings.Contains(view, "/repo-topic") {
 		t.Errorf("picker shows a directory:\n%s", view)
 	}
-	for i, line := range strings.Split(m.View(), "\n") {
+	for i, line := range strings.Split(m.View().Content, "\n") {
 		if got := ansi.StringWidth(line); got > 40 {
 			t.Errorf("line %d is %d columns wide: %q", i+1, got, ansi.Strip(line))
 		}
@@ -613,7 +613,7 @@ func TestReloadWhileHiddenDoesNotCrashOnReturn(t *testing.T) {
 	model, _ = model.Update(loadedMsg{gen: 1, review: review})
 
 	model, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
-	if view := ansi.Strip(model.(Model).View()); !strings.Contains(view, "x") {
+	if view := ansi.Strip(model.(Model).View().Content); !strings.Contains(view, "x") {
 		t.Errorf("page does not show the new diff:\n%s", view)
 	}
 }
@@ -749,7 +749,7 @@ func TestHideTestsKeyHidesTestFilesAndSavesTheSetting(t *testing.T) {
 	model, _ = model.Update(loadedMsg{gen: 1, review: review})
 
 	m, _ := press(model.(Model), "x")
-	view := ansi.Strip(m.View())
+	view := ansi.Strip(m.View().Content)
 	if strings.Contains(view, "settings-mapper.spec.ts") || !strings.Contains(view, "1 test file hidden") {
 		t.Errorf("the page still shows the test file:\n%s", view)
 	}
@@ -758,7 +758,7 @@ func TestHideTestsKeyHidesTestFilesAndSavesTheSetting(t *testing.T) {
 	}
 
 	m, _ = press(m, "x")
-	if view := ansi.Strip(m.View()); !strings.Contains(view, "settings-mapper.spec.ts") {
+	if view := ansi.Strip(m.View().Content); !strings.Contains(view, "settings-mapper.spec.ts") {
 		t.Errorf("the page does not show the test file again:\n%s", view)
 	}
 }
@@ -778,7 +778,7 @@ func TestFindFileJumpsToTheChosenFile(t *testing.T) {
 	if m.mode != finding {
 		t.Fatal("finder did not open")
 	}
-	view := ansi.Strip(m.View())
+	view := ansi.Strip(m.View().Content)
 	if !strings.Contains(view, "internal/ui/model.go") || !strings.Contains(view, "internal/ui/model_test.go") || strings.Contains(view, "cmd/main.go") {
 		t.Errorf("finder does not show only the matching files:\n%s", view)
 	}
@@ -790,8 +790,8 @@ func TestFindFileJumpsToTheChosenFile(t *testing.T) {
 
 	// Without a match, enter does nothing and esc goes back to the same place.
 	m, _ = press(m, "/", "z", "z", "z", "enter")
-	if m.mode != finding || !strings.Contains(ansi.Strip(m.View()), "No matching files.") {
-		t.Errorf("finder closed or does not say that nothing matches:\n%s", ansi.Strip(m.View()))
+	if m.mode != finding || !strings.Contains(ansi.Strip(m.View().Content), "No matching files.") {
+		t.Errorf("finder closed or does not say that nothing matches:\n%s", ansi.Strip(m.View().Content))
 	}
 	m, _ = press(m, "esc")
 	if m.mode != browsing || m.cursor != m.fileStarts[2] {

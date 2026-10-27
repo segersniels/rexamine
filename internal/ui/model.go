@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textarea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/segersniels/rexdiff/internal/agent"
@@ -185,17 +185,26 @@ type Model struct {
 // the agent starts a turn, or is nil without an agent to watch. markdownStyle
 // is a glamour style name, such as "dark". settings are the saved settings.
 func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, markdownStyle string, settings config.Config) Model {
+	// The components start with dark styles, so they get the styles for the terminal background.
+	isDark := markdownStyle != "light"
+
 	composer := textarea.New()
 	composer.ShowLineNumbers = false
 	composer.Prompt = ""
 	composer.CharLimit = 0
 	composer.SetHeight(3)
 	composer.KeyMap.InsertNewline.SetKeys("alt+enter", "ctrl+j")
-	composer.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	composerStyles := textarea.DefaultStyles(isDark)
+	composerStyles.Focused.CursorLine = lipgloss.NewStyle()
+	composer.SetStyles(composerStyles)
 
 	finder := textinput.New()
 	finder.Prompt = "/ "
 	finder.Placeholder = "Type part of a path…"
+	finder.SetStyles(textinput.DefaultStyles(isDark))
+
+	helpView := help.New()
+	helpView.Styles = help.DefaultStyles(isDark)
 
 	keys := newBrowseKeys()
 
@@ -219,7 +228,7 @@ func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, m
 		composeKeys:   newComposeKeys(),
 		pickKeys:      newPickKeys(),
 		findKeys:      newFindKeys(),
-		help:          help.New(),
+		help:          helpView,
 		spinner:       spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(accentStyle)),
 		composer:      composer,
 		finder:        finder,
@@ -275,7 +284,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.width, m.height = msg.Width, msg.Height
-		m.help.Width = msg.Width
+		m.help.SetWidth(msg.Width)
 		m.composer.SetWidth(m.composerTextWidth())
 		m.layout(m.files)
 		return m, nil
@@ -383,7 +392,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.PasteMsg:
+		// Pasted text goes to the box that takes text. The page ignores it.
+		var cmd tea.Cmd
+		switch m.mode {
+		case composing:
+			m.composer, cmd = m.composer.Update(msg)
+		case finding:
+			m.finder, cmd = m.finder.Update(msg)
+			m.selectedMatch = 0
+		}
+		return m, cmd
+
+	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
@@ -451,7 +472,7 @@ func (m *Model) showFiles() {
 }
 
 // updateBrowser handles keys while the user reads the page.
-func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateBrowser(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	page := m.bodyHeight()
 
 	switch {
@@ -530,7 +551,7 @@ func (m Model) updateBrowser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // updatePicker handles keys while the user chooses a worktree.
-func (m Model) updatePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.pickKeys.Up):
 		m.pick = max(0, m.pick-1)
@@ -559,7 +580,7 @@ func (m *Model) startFinder() tea.Cmd {
 
 // updateFinder handles keys while the user finds a file. Other keys edit the
 // query, and a new query moves the cursor back to the first match.
-func (m Model) updateFinder(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateFinder(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	matches := m.matchingFiles()
 
 	switch {
@@ -693,7 +714,7 @@ func (m Model) localSource() source.Local {
 }
 
 // updateComposer handles keys while the user writes a comment.
-func (m Model) updateComposer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateComposer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.composeKeys.Cycle):
 		if m.destination == toAgent {
@@ -738,14 +759,19 @@ func (m Model) updateComposer(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // selects lines with a drag. Releasing a drag, or clicking a line number,
 // opens the comment box for the selected lines.
 func (m *Model) handleMouse(msg tea.MouseMsg) tea.Cmd {
+	mouse := msg.Mouse()
+	_, press := msg.(tea.MouseClickMsg)
+	_, motion := msg.(tea.MouseMotionMsg)
+	_, release := msg.(tea.MouseReleaseMsg)
+
 	switch {
-	case msg.Button == tea.MouseButtonWheelUp:
+	case mouse.Button == tea.MouseWheelUp:
 		m.scrollBy(-3)
-	case msg.Button == tea.MouseButtonWheelDown:
+	case mouse.Button == tea.MouseWheelDown:
 		m.scrollBy(3)
 
-	case msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress:
-		i, ok := m.rowAt(msg.Y)
+	case mouse.Button == tea.MouseLeft && press:
+		i, ok := m.rowAt(mouse.Y)
 		if !ok {
 			return nil
 		}
@@ -770,16 +796,16 @@ func (m *Model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 		m.cursor = i
 		m.anchor = -1
 		m.dragging = m.rows[i].kind == codeRow
-		m.pressedGutter = m.dragging && msg.X >= 1 && msg.X <= ansi.StringWidth(m.rows[i].gutter)
+		m.pressedGutter = m.dragging && mouse.X >= 1 && mouse.X <= ansi.StringWidth(m.rows[i].gutter)
 		if m.dragging {
 			m.anchor = i
 		}
 
-	case msg.Action == tea.MouseActionMotion && m.dragging:
-		m.cursor = m.dragTarget(msg.Y)
+	case motion && m.dragging:
+		m.cursor = m.dragTarget(mouse.Y)
 		m.clamp()
 
-	case msg.Action == tea.MouseActionRelease && m.dragging:
+	case release && m.dragging:
 		m.dragging = false
 
 		// A click on the code, not on a line number, only moves the cursor.
@@ -1148,8 +1174,18 @@ func (m Model) screenLines() []screenLine {
 	return lines
 }
 
-// View draws the screen.
-func (m Model) View() string {
+// View draws the screen in the alternate screen, with mouse and focus
+// reports on.
+func (m Model) View() tea.View {
+	view := tea.NewView(m.screen())
+	view.AltScreen = true
+	view.MouseMode = tea.MouseModeCellMotion
+	view.ReportFocus = true
+	return view
+}
+
+// screen draws the content of the screen.
+func (m Model) screen() string {
 	switch {
 	case m.width == 0:
 		return ""
@@ -1214,7 +1250,7 @@ func (m Model) finderView() string {
 	bar := barStyle.Render(title + strings.Repeat(" ", max(0, m.width-ansi.StringWidth(title))))
 
 	finder := m.finder
-	finder.Width = max(1, m.contentWidth()-ansi.StringWidth(finder.Prompt)-1)
+	finder.SetWidth(max(1, m.contentWidth()-ansi.StringWidth(finder.Prompt)-1))
 	input := " " + finder.View()
 
 	// The list scrolls only as far as it must to keep the cursor on the screen.
