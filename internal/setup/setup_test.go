@@ -82,6 +82,19 @@ func TestRunInstallsEverything(t *testing.T) {
 	}
 }
 
+func TestRunWithoutABinaryLetsRexUsePath(t *testing.T) {
+	dir := useTempConfig(t)
+
+	opts := Options{Rex: true, Out: &bytes.Buffer{}}
+	if err := Run(testFiles, opts); err != nil {
+		t.Fatal(err)
+	}
+
+	if init := readFile(t, filepath.Join(dir, "config", "rex", "init.lua")); strings.Contains(init, "bin =") {
+		t.Errorf("init.lua sets a binary path:\n%s", init)
+	}
+}
+
 func TestRunWithoutAKeyBindsNothing(t *testing.T) {
 	dir := useTempConfig(t)
 

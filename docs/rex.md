@@ -22,7 +22,7 @@ To change the options, edit the `setup` call in `~/.config/rex/init.lua` and run
 
 ```lua
 require("rexdiff").setup{
-  bin = "/path/to/rexdiff",  -- Rex starts rexdiff with this path.
+  bin = "/path/to/rexdiff",  -- Only when rexdiff is not on PATH. Rex runs this path on the host of the session.
   key = "ctrl+alt+cmd+d",    -- The key that toggles the pane.
   ratio = 0.55,              -- The share of the width that the agent pane keeps.
 }

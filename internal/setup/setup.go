@@ -22,7 +22,8 @@ type Files struct {
 
 // Options selects what to install.
 type Options struct {
-	// Binary is the path that Rex starts rexdiff with.
+	// Binary is the path that Rex starts rexdiff with. An empty path lets Rex
+	// find rexdiff on PATH.
 	Binary string
 
 	// Key toggles the rexdiff pane. An empty key binds nothing.
@@ -164,7 +165,9 @@ func setupCall(opts Options) string {
 	call.WriteString("do\n")
 	call.WriteString("  local ok, err = pcall(function()\n")
 	call.WriteString("    " + rexRequire + ".setup{\n")
-	call.WriteString("      bin = " + luaString(opts.Binary) + ",\n")
+	if opts.Binary != "" {
+		call.WriteString("      bin = " + luaString(opts.Binary) + ",\n")
+	}
 	if opts.Key != "" {
 		call.WriteString("      key = " + luaString(opts.Key) + ",\n")
 	}

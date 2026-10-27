@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2/compat"
@@ -265,9 +264,9 @@ func runUninstall() int {
 	return 0
 }
 
-// binaryPath finds the path for Rex to start rexdiff with. It prefers the
-// rexdiff on PATH, such as a package manager's link, because that path stays
-// the same across upgrades.
+// binaryPath finds the path for Rex to start rexdiff with. It returns an
+// empty path when the rexdiff on PATH is this binary, so that Rex looks it up
+// on PATH. Each host then starts its own rexdiff, such as on a remote server.
 func binaryPath() (string, error) {
 	self, err := os.Executable()
 	if err != nil {
@@ -282,7 +281,7 @@ func binaryPath() (string, error) {
 	selfInfo, selfErr := os.Stat(self)
 	pathInfo, pathErr := os.Stat(onPath)
 	if selfErr == nil && pathErr == nil && os.SameFile(selfInfo, pathInfo) {
-		return filepath.Abs(onPath)
+		return "", nil
 	}
 	return self, nil
 }
