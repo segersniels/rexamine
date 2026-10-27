@@ -5,12 +5,14 @@ import (
 	"charm.land/lipgloss/v2/compat"
 )
 
-// Colors adapt to light and dark terminals. The diff colors follow GitHub's.
+// Colors adapt to light and dark terminals. The diff text colors are the
+// terminal theme's green and red. The line backgrounds follow GitHub's until
+// the terminal reports its theme colors.
 var (
 	accentColor    = compat.AdaptiveColor{Light: lipgloss.Color("#0969da"), Dark: lipgloss.Color("#58a6ff")}
 	dimColor       = compat.AdaptiveColor{Light: lipgloss.Color("#6e7781"), Dark: lipgloss.Color("#7d8590")}
-	addedColor     = compat.AdaptiveColor{Light: lipgloss.Color("#1a7f37"), Dark: lipgloss.Color("#3fb950")}
-	removedColor   = compat.AdaptiveColor{Light: lipgloss.Color("#cf222e"), Dark: lipgloss.Color("#f85149")}
+	addedColor     = lipgloss.Green
+	removedColor   = lipgloss.Red
 	addedLineBg    = compat.AdaptiveColor{Light: lipgloss.Color("#e6ffec"), Dark: lipgloss.Color("#12261e")}
 	removedLineBg  = compat.AdaptiveColor{Light: lipgloss.Color("#ffebe9"), Dark: lipgloss.Color("#25171c")}
 	warningColor   = compat.AdaptiveColor{Light: lipgloss.Color("#9a6700"), Dark: lipgloss.Color("#d29922")}

@@ -16,6 +16,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/segersniels/rexdiff/internal/agent"
@@ -179,6 +180,8 @@ type Model struct {
 
 	// newRelease tells about a newer release of rexdiff, or is nil.
 	newRelease *update.Notice
+
+	theme terminalTheme
 }
 
 // New creates the review screen. Comments go to the sender. turns reports when
@@ -237,6 +240,7 @@ func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, m
 		loadGen:       1,
 		loadStarted:   time.Now(),
 		anchor:        -1,
+		theme:         newTerminalTheme(),
 	}
 	m.enableKeys()
 	return m
@@ -267,7 +271,7 @@ func (m *Model) enableKeys() {
 
 // Init starts the first load.
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{loadReview(m.source, m.loadGen), m.spinner.Tick}
+	cmds := []tea.Cmd{loadReview(m.source, m.loadGen), m.spinner.Tick, requestTerminalTheme()}
 	if m.turns != nil {
 		cmds = append(cmds, waitForTurn(m.turns))
 	}
@@ -390,6 +394,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = ""
 			m.clamp()
 		}
+		return m, nil
+
+	case tea.BackgroundColorMsg, uv.UnknownOscEvent:
+		m.theme = m.theme.withReply(msg)
 		return m, nil
 
 	case tea.PasteMsg:
@@ -1329,7 +1337,7 @@ func (m Model) renderRow(i int) string {
 	}
 
 	if r.kind == codeRow {
-		return marker + renderCode(r, m.contentWidth(), selected)
+		return marker + renderCode(r, m.contentWidth(), selected, m.theme)
 	}
 	return marker + r.text
 }

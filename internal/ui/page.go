@@ -224,18 +224,18 @@ func maxLineNumber(file diff.File) int {
 	return largest
 }
 
-// renderCode draws a code row at the full width, with the background of its
-// change, or the selection background when it is selected.
-func renderCode(r row, width int, selected bool) string {
+// renderCode draws a code row at the full width, with the theme's background
+// for its change, or the selection background when it is selected.
+func renderCode(r row, width int, selected bool, theme terminalTheme) string {
 	style := lipgloss.NewStyle()
 	gutterStyle := dimStyle
 	switch r.change {
 	case diff.Added:
-		style = style.Background(addedLineBg)
-		gutterStyle = addedStyle.Background(addedLineBg)
+		style = style.Background(theme.addedLineBg)
+		gutterStyle = addedStyle.Background(theme.addedLineBg)
 	case diff.Removed:
-		style = style.Background(removedLineBg)
-		gutterStyle = removedStyle.Background(removedLineBg)
+		style = style.Background(theme.removedLineBg)
+		gutterStyle = removedStyle.Background(theme.removedLineBg)
 	}
 	if selected {
 		style = style.Background(selectedLineBg)
