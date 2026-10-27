@@ -104,7 +104,7 @@ main() {
     say "$install_dir is not in your PATH. Add it to your shell's configuration:"
     case "$(basename "${SHELL:-sh}")" in
     fish) echo "  fish_add_path $install_dir" ;;
-    zsh) echo "  echo 'export PATH=\"$install_dir:\$PATH\"' >> ~/.zshrc" ;;
+    zsh) echo "  echo 'export PATH=\"$install_dir:\$PATH\"' >> ~/.zshenv" ;;
     bash) echo "  echo 'export PATH=\"$install_dir:\$PATH\"' >> ~/.bashrc" ;;
     *) echo "  export PATH=\"$install_dir:\$PATH\"" ;;
     esac
