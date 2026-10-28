@@ -1,10 +1,10 @@
-# Contributing to rexdiff
+# Contributing to rexamine
 
-Thank you for helping to improve rexdiff. This guide explains how to report a problem, how to propose a change, and how a release works.
+Thank you for helping to improve rexamine. This guide explains how to report a problem, how to propose a change, and how a release works.
 
 ## Report a bug or ask for a feature
 
-Open an [issue](https://github.com/segersniels/rexdiff/issues/new/choose) and pick the bug report or the feature request form. For a bug, include the output of `rexdiff --version` and the steps that cause the problem.
+Open an [issue](https://github.com/segersniels/rexamine/issues/new/choose) and pick the bug report or the feature request form. For a bug, include the output of `rexamine --version` and the steps that cause the problem.
 
 For a large change, open an issue before you write code. Then we can agree on the approach before you spend time on it.
 
@@ -15,13 +15,13 @@ You need:
 - [Go](https://go.dev/dl/) 1.24 or later.
 - `git`.
 - The [GitHub CLI](https://cli.github.com) (`gh`), to test pull request reviews.
-- [Rex](https://www.superlogical.com/rex), to test the pane and sending comments. Without Rex, rexdiff copies comments on local changes to the clipboard and posts comments on a pull request to GitHub.
+- [Rex](https://www.superlogical.com/rex), to test the pane and sending comments. Without Rex, rexamine copies comments on local changes to the clipboard and posts comments on a pull request to GitHub.
 
 Clone your fork and build:
 
 ```sh
-git clone https://github.com/<your-user>/rexdiff.git
-cd rexdiff
+git clone https://github.com/<your-user>/rexamine.git
+cd rexamine
 make install   # build and install to ~/.local/bin
 make setup     # install, then add the Rex module and the agent skill
 ```
@@ -67,7 +67,7 @@ Only maintainers can release. A release builds the binaries for macOS and Linux,
 
 The workflow runs the tests, pushes the tag `v<version>`, runs GoReleaser, and publishes to npm. If a step fails after the tag is pushed, fix the cause, delete the tag and any GitHub release that the run created, and run the workflow again. The npm step skips packages that are already published.
 
-npm publishes with [trusted publishing](https://docs.npmjs.com/trusted-publishers), so the workflow needs no npm token. Each npm package (`@segersniels/rexdiff` and the four `@segersniels/rexdiff-<os>-<cpu>` packages) must list this repository and the `release.yml` workflow as a trusted publisher.
+npm publishes with [trusted publishing](https://docs.npmjs.com/trusted-publishers), so the workflow needs no npm token. Each npm package (`@segersniels/rexamine` and the four `@segersniels/rexamine-<os>-<cpu>` packages) must list this repository and the `release.yml` workflow as a trusted publisher.
 
 ## License
 

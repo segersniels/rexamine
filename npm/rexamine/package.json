@@ -1,9 +1,9 @@
 {
-  "name": "@segersniels/rexdiff",
+  "name": "@segersniels/rexamine",
   "version": "0.0.0",
   "description": "Review a diff beside your coding agent in Rex, and send comments on its lines straight into the agent's prompt.",
   "bin": {
-    "rexdiff": "bin/rexdiff.js"
+    "rexamine": "bin/rexamine.js"
   },
   "files": [
     "bin"
@@ -13,11 +13,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/segersniels/rexdiff.git"
+    "url": "git+https://github.com/segersniels/rexamine.git"
   },
-  "homepage": "https://github.com/segersniels/rexdiff#readme",
+  "homepage": "https://github.com/segersniels/rexamine#readme",
   "bugs": {
-    "url": "https://github.com/segersniels/rexdiff/issues"
+    "url": "https://github.com/segersniels/rexamine/issues"
   },
   "keywords": [
     "rex",

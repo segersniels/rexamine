@@ -9,9 +9,9 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/segersniels/rexdiff/internal/diff"
-	"github.com/segersniels/rexdiff/internal/github"
-	"github.com/segersniels/rexdiff/internal/source"
+	"github.com/segersniels/rexamine/internal/diff"
+	"github.com/segersniels/rexamine/internal/github"
+	"github.com/segersniels/rexamine/internal/source"
 )
 
 // newMarkdownRenderer creates a markdown renderer that wraps to width and

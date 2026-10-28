@@ -1,5 +1,5 @@
 name: Bug report
-description: Report something in rexdiff that does not work as expected.
+description: Report something in rexamine that does not work as expected.
 labels: [bug]
 body:
   - type: textarea
@@ -20,15 +20,15 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. Run `rexdiff` in a repository with ...
+        1. Run `rexamine` in a repository with ...
         2. Press ...
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: rexdiff version
-      description: The output of `rexdiff --version`.
+      label: rexamine version
+      description: The output of `rexamine --version`.
     validations:
       required: true
   - type: input

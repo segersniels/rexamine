@@ -1,49 +1,49 @@
-<h1 align="center">rexdiff</h1>
+<h1 align="center">rexamine</h1>
 
 <p align="center">
   Review a diff beside your coding agent, and send comments on its lines straight into the agent's prompt.
 </p>
 
 <p align="center">
-  <a href="https://github.com/segersniels/rexdiff/actions/workflows/ci.yml"><img src="https://github.com/segersniels/rexdiff/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://www.npmjs.com/package/@segersniels/rexdiff"><img src="https://img.shields.io/npm/v/@segersniels/rexdiff" alt="npm"></a>
-  <a href="https://github.com/segersniels/rexdiff/blob/main/LICENSE"><img src="https://img.shields.io/github/license/segersniels/rexdiff" alt="MIT license"></a>
+  <a href="https://github.com/segersniels/rexamine/actions/workflows/ci.yml"><img src="https://github.com/segersniels/rexamine/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.npmjs.com/package/@segersniels/rexamine"><img src="https://img.shields.io/npm/v/@segersniels/rexamine" alt="npm"></a>
+  <a href="https://github.com/segersniels/rexamine/blob/main/LICENSE"><img src="https://img.shields.io/github/license/segersniels/rexamine" alt="MIT license"></a>
 </p>
 
 <p align="center">
-  <img src="https://github.com/segersniels/rexdiff/raw/main/assets/screenshot.png" alt="rexdiff in a Rex pane beside a Claude Code session" width="100%">
+  <img src="https://github.com/segersniels/rexamine/raw/main/assets/screenshot.png" alt="rexamine in a Rex pane beside a Claude Code session" width="100%">
 </p>
 
-rexdiff is a terminal diff viewer for [Rex](https://www.superlogical.com/rex). It opens in a pane next to your agent session, such as Claude Code. Select lines, write a question or a remark, and press Enter. rexdiff pastes the file, the line numbers, the selected lines, and your comment into the agent's prompt, so you can keep the conversation in the session you already have.
+rexamine is a terminal diff viewer for [Rex](https://www.superlogical.com/rex). It opens in a pane next to your agent session, such as Claude Code. Select lines, write a question or a remark, and press Enter. rexamine pastes the file, the line numbers, the selected lines, and your comment into the agent's prompt, so you can keep the conversation in the session you already have.
 
 ---
 
 ## Quickstart
 
-Install rexdiff, add it to Rex, and install the agent skill with one command:
+Install rexamine, add it to Rex, and install the agent skill with one command:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/segersniels/rexdiff/main/scripts/install.sh | sh
+curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/segersniels/rexamine/main/scripts/install.sh | sh
 ```
 
 Or install it with npm, then run the setup yourself:
 
 ```sh
-npm install -g @segersniels/rexdiff
-rexdiff setup
+npm install -g @segersniels/rexamine
+rexamine setup
 ```
 
-Focus your agent's pane in Rex and press `ctrl+alt+cmd+d`. rexdiff opens beside it with the changes on your branch. Move to a line, press `c`, write a comment, and press `enter` to send it to the agent.
+Focus your agent's pane in Rex and press `ctrl+alt+cmd+d`. rexamine opens beside it with the changes on your branch. Move to a line, press `c`, write a comment, and press `enter` to send it to the agent.
 
-You can also run rexdiff in any terminal:
+You can also run rexamine in any terminal:
 
 ```sh
-rexdiff                  # the changes on the current branch
-rexdiff --uncommitted    # only the uncommitted changes
-rexdiff 123              # pull request 123 of the current repository
+rexamine                  # the changes on the current branch
+rexamine --uncommitted    # only the uncommitted changes
+rexamine 123              # pull request 123 of the current repository
 ```
 
-Without an agent pane, rexdiff copies each comment on local changes to the clipboard, so you can paste it into any agent. In a pull request without an agent pane, rexdiff posts each comment on GitHub.
+Without an agent pane, rexamine copies each comment on local changes to the clipboard, so you can paste it into any agent. In a pull request without an agent pane, rexamine posts each comment on GitHub.
 
 ## Features
 
@@ -58,9 +58,9 @@ Without an agent pane, rexdiff copies each comment on local changes to the clipb
 
 ## Docs
 
-- [**Installation and setup**](https://github.com/segersniels/rexdiff/blob/main/docs/install.md)
-- [**Usage and keys**](https://github.com/segersniels/rexdiff/blob/main/docs/usage.md)
-- [**Rex module and agent skill**](https://github.com/segersniels/rexdiff/blob/main/docs/rex.md)
-- [**Contributing**](https://github.com/segersniels/rexdiff/blob/main/CONTRIBUTING.md)
+- [**Installation and setup**](https://github.com/segersniels/rexamine/blob/main/docs/install.md)
+- [**Usage and keys**](https://github.com/segersniels/rexamine/blob/main/docs/usage.md)
+- [**Rex module and agent skill**](https://github.com/segersniels/rexamine/blob/main/docs/rex.md)
+- [**Contributing**](https://github.com/segersniels/rexamine/blob/main/CONTRIBUTING.md)
 
-This repository is licensed under the [MIT License](https://github.com/segersniels/rexdiff/blob/main/LICENSE).
+This repository is licensed under the [MIT License](https://github.com/segersniels/rexamine/blob/main/LICENSE).

@@ -8,8 +8,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/segersniels/rexdiff/internal/diff"
-	"github.com/segersniels/rexdiff/internal/source"
+	"github.com/segersniels/rexamine/internal/diff"
+	"github.com/segersniels/rexamine/internal/source"
 )
 
 // rowKind tells how a row is drawn and whether it can be commented on.

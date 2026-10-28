@@ -28,10 +28,10 @@ func TestLoadWithoutAFileGivesTheDefaults(t *testing.T) {
 func TestLoadWithABrokenFileGivesTheDefaults(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	if err := os.MkdirAll(filepath.Join(dir, "rexdiff"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "rexamine"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "rexdiff", "config.json"), []byte(`{"hideTests": tru`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "rexamine", "config.json"), []byte(`{"hideTests": tru`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -50,7 +50,7 @@ func TestRemoveDeletesTheSettingsFolder(t *testing.T) {
 	if err := Remove(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "rexdiff")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(dir, "rexamine")); !os.IsNotExist(err) {
 		t.Errorf("the settings folder still exists: %v", err)
 	}
 }

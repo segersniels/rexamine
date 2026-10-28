@@ -1,5 +1,5 @@
 // Package config keeps the settings of the review screen between runs, in
-// $XDG_CONFIG_HOME/rexdiff/config.json or ~/.config/rexdiff/config.json.
+// $XDG_CONFIG_HOME/rexamine/config.json or ~/.config/rexamine/config.json.
 package config
 
 import (
@@ -72,5 +72,5 @@ func filePath() (string, error) {
 		}
 		base = filepath.Join(home, ".config")
 	}
-	return filepath.Join(base, "rexdiff", "config.json"), nil
+	return filepath.Join(base, "rexamine", "config.json"), nil
 }

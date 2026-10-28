@@ -1,4 +1,4 @@
-// Package ui is the review screen of rexdiff: a scrollable page with the
+// Package ui is the review screen of rexamine: a scrollable page with the
 // review's details and its diff, a line cursor, line selection, and a
 // composer that sends comments on the selected lines to an agent.
 package ui
@@ -19,12 +19,12 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/segersniels/rexdiff/internal/agent"
-	"github.com/segersniels/rexdiff/internal/config"
-	"github.com/segersniels/rexdiff/internal/diff"
-	"github.com/segersniels/rexdiff/internal/github"
-	"github.com/segersniels/rexdiff/internal/source"
-	"github.com/segersniels/rexdiff/internal/update"
+	"github.com/segersniels/rexamine/internal/agent"
+	"github.com/segersniels/rexamine/internal/config"
+	"github.com/segersniels/rexamine/internal/diff"
+	"github.com/segersniels/rexamine/internal/github"
+	"github.com/segersniels/rexamine/internal/source"
+	"github.com/segersniels/rexamine/internal/update"
 )
 
 // watchInterval is how often a local review checks the repository for changes.
@@ -178,7 +178,7 @@ type Model struct {
 	status   string
 	statusID int
 
-	// newRelease tells about a newer release of rexdiff, or is nil.
+	// newRelease tells about a newer release of rexamine, or is nil.
 	newRelease *update.Notice
 
 	theme terminalTheme
@@ -1455,7 +1455,7 @@ func (m Model) footerView() string {
 
 	// The notice wraps instead of being cut, so the update command stays complete in a narrow pane.
 	if m.newRelease != nil {
-		notice := accentStyle.Render("rexdiff "+m.newRelease.Version+" is available:") + " " + dimStyle.Render("`rexdiff update`")
+		notice := accentStyle.Render("rexamine "+m.newRelease.Version+" is available:") + " " + dimStyle.Render("`rexamine update`")
 		lines = append([]string{ansi.Wrap(" "+notice, m.width, "/")}, lines...)
 	}
 	return strings.Join(lines, "\n")

@@ -1,9 +1,9 @@
 /**
- * Publishes rexdiff to npm from the binaries that GoReleaser built.
+ * Publishes rexamine to npm from the binaries that GoReleaser built.
  *
  * It publishes one package per platform with the binary in it, such as
- * @segersniels/rexdiff-darwin-arm64, and then the main package
- * @segersniels/rexdiff, which lists them as optional dependencies. npm then
+ * @segersniels/rexamine-darwin-arm64, and then the main package
+ * @segersniels/rexamine, which lists them as optional dependencies. npm then
  * installs only the binary that matches the user's platform.
  *
  * Usage: node scripts/npm-publish.mjs <version> [--dry-run]
@@ -17,7 +17,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const SCOPE = "@segersniels";
-const NAME = "rexdiff";
+const NAME = "rexamine";
 const OUT_DIR = "dist/npm";
 
 /** Maps Go's architecture names to the names npm uses in "cpu". */
@@ -32,14 +32,14 @@ if (!versionArg) {
 const version = versionArg.replace(/^v/, "");
 const dryRun = flags.includes("--dry-run");
 
-const main = JSON.parse(fs.readFileSync("npm/rexdiff/package.json", "utf8"));
+const main = JSON.parse(fs.readFileSync("npm/rexamine/package.json", "utf8"));
 
 const binaries = JSON.parse(fs.readFileSync("dist/artifacts.json", "utf8")).filter(
   (artifact) => artifact.type === "Binary" && artifact.name === NAME,
 );
 
 if (binaries.length === 0) {
-  console.error("No rexdiff binaries in dist/artifacts.json. Run goreleaser first.");
+  console.error("No rexamine binaries in dist/artifacts.json. Run goreleaser first.");
   process.exit(1);
 }
 
@@ -76,7 +76,7 @@ for (const binary of binaries) {
 
 // The main package is published last, so it never points to a missing binary.
 const mainDir = path.join(OUT_DIR, NAME);
-fs.cpSync("npm/rexdiff", mainDir, { recursive: true });
+fs.cpSync("npm/rexamine", mainDir, { recursive: true });
 fs.copyFileSync("README.md", path.join(mainDir, "README.md"));
 fs.copyFileSync("LICENSE", path.join(mainDir, "LICENSE"));
 writeJSON(path.join(mainDir, "package.json"), { ...main, version, optionalDependencies: platformPackages });

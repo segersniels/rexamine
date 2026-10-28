@@ -1,4 +1,4 @@
-// Command rexdiff shows a diff to review in the terminal: the changes on the
+// Command rexamine shows a diff to review in the terminal: the changes on the
 // current branch, or a GitHub pull request. Comments on diff lines go to a
 // coding agent in another Rex pane, or to the clipboard.
 package main
@@ -15,46 +15,46 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2/compat"
 
-	"github.com/segersniels/rexdiff/internal/agent"
-	"github.com/segersniels/rexdiff/internal/config"
-	"github.com/segersniels/rexdiff/internal/setup"
-	"github.com/segersniels/rexdiff/internal/source"
-	"github.com/segersniels/rexdiff/internal/ui"
-	"github.com/segersniels/rexdiff/internal/update"
+	"github.com/segersniels/rexamine/internal/agent"
+	"github.com/segersniels/rexamine/internal/config"
+	"github.com/segersniels/rexamine/internal/setup"
+	"github.com/segersniels/rexamine/internal/source"
+	"github.com/segersniels/rexamine/internal/ui"
+	"github.com/segersniels/rexamine/internal/update"
 )
 
 // version is set at build time by the release.
 var version = "dev"
 
 // The Rex module and the agent skill ship inside the binary, so that
-// `rexdiff setup` can install them.
+// `rexamine setup` can install them.
 var (
-	//go:embed rex/rexdiff.lua
+	//go:embed rex/rexamine.lua
 	rexModule []byte
 
-	//go:embed skills/rexdiff/SKILL.md
+	//go:embed skills/rexamine/SKILL.md
 	skill []byte
 )
 
-const usage = `Usage: rexdiff [flags] [<pr-number> | <pr-url>]
-       rexdiff setup [flags]
-       rexdiff update
-       rexdiff uninstall
+const usage = `Usage: rexamine [flags] [<pr-number> | <pr-url>]
+       rexamine setup [flags]
+       rexamine update
+       rexamine uninstall
 
 Shows the changes on the current branch compared to the default branch.
 Give a pull request number or URL to show that pull request instead.
 
-Run "rexdiff setup" once to add rexdiff to Rex and to install the agent skill.
-Run "rexdiff update" to install the latest release.
-Run "rexdiff uninstall" to remove rexdiff and everything that setup installed.
+Run "rexamine setup" once to add rexamine to Rex and to install the agent skill.
+Run "rexamine update" to install the latest release.
+Run "rexamine uninstall" to remove rexamine and everything that setup installed.
 
 Flags:
 `
 
-const setupUsage = `Usage: rexdiff setup [flags]
+const setupUsage = `Usage: rexamine setup [flags]
 
 Installs the Rex module, loads it from Rex's init.lua with a key that
-toggles the rexdiff pane, and installs the agent skill for each coding
+toggles the rexamine pane, and installs the agent skill for each coding
 agent that it finds, such as Claude Code and Codex. Run it again after an
 update to update the module and the skill.
 
@@ -76,7 +76,7 @@ func run() int {
 		return runUninstall()
 	}
 
-	flags := flag.NewFlagSet("rexdiff", flag.ContinueOnError)
+	flags := flag.NewFlagSet("rexamine", flag.ContinueOnError)
 	agentPane := flags.String("agent", "", "send comments to the Rex pane with this `block` ID instead of the clipboard")
 	uncommitted := flags.Bool("uncommitted", false, "start with uncommitted changes instead of the whole branch")
 	showVersion := flags.Bool("version", false, "print the version and exit")
@@ -102,12 +102,12 @@ func run() int {
 
 	src, err := chooseSource(flags.Arg(0), *uncommitted)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "rexdiff:", err)
+		fmt.Fprintln(os.Stderr, "rexamine:", err)
 		return 1
 	}
 
-	// An update without `rexdiff setup` leaves the old module and skill behind, so each start brings them
-	// up to date. A failure only leaves the old files, which `rexdiff setup` can fix, so the screen still opens.
+	// An update without `rexamine setup` leaves the old module and skill behind, so each start brings them
+	// up to date. A failure only leaves the old files, which `rexamine setup` can fix, so the screen still opens.
 	_ = setup.Refresh(setup.Files{RexModule: rexModule, Skill: skill})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -139,7 +139,7 @@ func run() int {
 		}
 	}()
 	if _, err := program.Run(); err != nil {
-		fmt.Fprintln(os.Stderr, "rexdiff:", err)
+		fmt.Fprintln(os.Stderr, "rexamine:", err)
 		return 1
 	}
 	return 0
@@ -168,8 +168,8 @@ func chooseSource(target string, uncommitted bool) (source.Source, error) {
 
 // runSetup installs the Rex module and the agent skill.
 func runSetup(args []string) int {
-	flags := flag.NewFlagSet("rexdiff setup", flag.ContinueOnError)
-	key := flags.String("key", "ctrl+alt+cmd+d", "the `key` that toggles the rexdiff pane; empty binds no key")
+	flags := flag.NewFlagSet("rexamine setup", flag.ContinueOnError)
+	key := flags.String("key", "ctrl+alt+cmd+d", "the `key` that toggles the rexamine pane; empty binds no key")
 	noRex := flags.Bool("no-rex", false, "do not install the Rex module")
 	noSkill := flags.Bool("no-skill", false, "do not install the agent skill")
 	flags.Usage = func() {
@@ -186,7 +186,7 @@ func runSetup(args []string) int {
 
 	binary, err := binaryPath()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "rexdiff setup:", err)
+		fmt.Fprintln(os.Stderr, "rexamine setup:", err)
 		return 1
 	}
 
@@ -198,23 +198,23 @@ func runSetup(args []string) int {
 		Out:    os.Stdout,
 	})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "rexdiff setup:", err)
+		fmt.Fprintln(os.Stderr, "rexamine setup:", err)
 		return 1
 	}
 	return 0
 }
 
 // runUpdate installs the latest release in the same way as this installation,
-// with npm or with the install script. Both also run `rexdiff setup`, so the
+// with npm or with the install script. Both also run `rexamine setup`, so the
 // Rex module and the agent skill get the update too.
 func runUpdate() int {
 	command := update.Command()
-	fmt.Println("rexdiff: running", command)
+	fmt.Println("rexamine: running", command)
 
 	cmd := exec.Command("sh", "-c", command)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
-		fmt.Fprintln(os.Stderr, "rexdiff update:", err)
+		fmt.Fprintln(os.Stderr, "rexamine update:", err)
 		return 1
 	}
 	return 0
@@ -224,56 +224,56 @@ func runUpdate() int {
 // settings, and then the binary. The binary goes last, so a failed step can run again.
 func runUninstall() int {
 	if err := setup.Uninstall(os.Stdout); err != nil {
-		fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
+		fmt.Fprintln(os.Stderr, "rexamine uninstall:", err)
 		return 1
 	}
 
 	if err := update.RemoveCache(); err != nil {
-		fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
+		fmt.Fprintln(os.Stderr, "rexamine uninstall:", err)
 		return 1
 	}
 
 	if err := config.Remove(); err != nil {
-		fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
+		fmt.Fprintln(os.Stderr, "rexamine uninstall:", err)
 		return 1
 	}
 
 	binary, err := update.Binary()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
+		fmt.Fprintln(os.Stderr, "rexamine uninstall:", err)
 		return 1
 	}
 
 	// npm also keeps the package and the link on PATH, so npm must remove them.
 	if update.InstalledWithNpm(binary) {
-		cmd := exec.Command("npm", "uninstall", "-g", "@segersniels/rexdiff")
+		cmd := exec.Command("npm", "uninstall", "-g", "@segersniels/rexamine")
 		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 		if err := cmd.Run(); err != nil {
-			fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
+			fmt.Fprintln(os.Stderr, "rexamine uninstall:", err)
 			return 1
 		}
-		fmt.Println("✓ Binary: removed the npm package @segersniels/rexdiff")
+		fmt.Println("✓ Binary: removed the npm package @segersniels/rexamine")
 		return 0
 	}
 
 	if err := os.Remove(binary); err != nil {
-		fmt.Fprintln(os.Stderr, "rexdiff uninstall:", err)
+		fmt.Fprintln(os.Stderr, "rexamine uninstall:", err)
 		return 1
 	}
 	fmt.Println("✓ Binary: removed", binary)
 	return 0
 }
 
-// binaryPath finds the path for Rex to start rexdiff with. It returns an
-// empty path when the rexdiff on PATH is this binary, so that Rex looks it up
-// on PATH. Each host then starts its own rexdiff, such as on a remote server.
+// binaryPath finds the path for Rex to start rexamine with. It returns an
+// empty path when the rexamine on PATH is this binary, so that Rex looks it up
+// on PATH. Each host then starts its own rexamine, such as on a remote server.
 func binaryPath() (string, error) {
 	self, err := os.Executable()
 	if err != nil {
 		return "", err
 	}
 
-	onPath, err := exec.LookPath("rexdiff")
+	onPath, err := exec.LookPath("rexamine")
 	if err != nil {
 		return self, nil
 	}

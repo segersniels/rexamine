@@ -1,11 +1,11 @@
-// Package source loads the changes that rexdiff shows: a GitHub pull request,
+// Package source loads the changes that rexamine shows: a GitHub pull request,
 // or the local changes in a git repository.
 package source
 
 import (
 	"fmt"
 
-	"github.com/segersniels/rexdiff/internal/github"
+	"github.com/segersniels/rexamine/internal/github"
 )
 
 // Review is a diff to review and the details that describe it.
@@ -26,7 +26,7 @@ type Review struct {
 	PullRequest *github.PullRequest
 }
 
-// Source loads a review. rexdiff calls Load again to reload it.
+// Source loads a review. rexamine calls Load again to reload it.
 type Source interface {
 	Load() (Review, error)
 }

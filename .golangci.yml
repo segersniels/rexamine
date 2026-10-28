@@ -17,4 +17,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/segersniels/rexdiff
+        - github.com/segersniels/rexamine

@@ -62,13 +62,13 @@ type Local struct {
 	PreviousTurnStart string
 
 	// TurnStartedAt is when the agent started its latest turn, or when
-	// rexdiff opened during a turn.
+	// rexamine opened during a turn.
 	TurnStartedAt time.Time
 
 	// TurnEndedAt is when the latest turn ended, or zero while the agent works.
 	TurnEndedAt time.Time
 
-	// JoinedTurn is set when rexdiff opened while the agent worked. TurnStart
+	// JoinedTurn is set when rexamine opened while the agent worked. TurnStart
 	// then holds the working tree from that moment, not from the start of the turn.
 	JoinedTurn bool
 }
@@ -172,9 +172,9 @@ func (l Local) loadLastTurn(root, branch string) (Review, error) {
 		return waiting, nil
 	}
 
-	// A joined turn compares with the working tree from when rexdiff opened.
+	// A joined turn compares with the working tree from when rexamine opened.
 	if base == l.TurnStart && l.JoinedTurn {
-		review.Base = "rexdiff opened"
+		review.Base = "rexamine opened"
 	}
 
 	review.Diff, err = git(root, "diff", "--no-color", "--no-ext-diff", "-M", base, now)
@@ -190,7 +190,7 @@ func (l Local) turnProgress() string {
 		return "turn ended " + TimeAgo(l.TurnEndedAt)
 	}
 
-	// rexdiff does not know when a joined turn started.
+	// rexamine does not know when a joined turn started.
 	if l.JoinedTurn {
 		return "agent working"
 	}
@@ -211,7 +211,7 @@ func Snapshot(dir string) (string, error) {
 // snapshot adds every file to a copy of the index and writes it as a tree.
 // The real index stays as it is, so the user's staged changes do not change.
 func snapshot(root string) (string, error) {
-	dir, err := os.MkdirTemp("", "rexdiff-index-*")
+	dir, err := os.MkdirTemp("", "rexamine-index-*")
 	if err != nil {
 		return "", err
 	}

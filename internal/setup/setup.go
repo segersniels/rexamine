@@ -1,4 +1,4 @@
-// Package setup installs the parts of rexdiff that live outside the binary:
+// Package setup installs the parts of rexamine that live outside the binary:
 // the Rex module with its key binding, and the skill for each installed agent.
 package setup
 
@@ -22,11 +22,11 @@ type Files struct {
 
 // Options selects what to install.
 type Options struct {
-	// Binary is the path that Rex starts rexdiff with. An empty path lets Rex
-	// find rexdiff on PATH.
+	// Binary is the path that Rex starts rexamine with. An empty path lets Rex
+	// find rexamine on PATH.
 	Binary string
 
-	// Key toggles the rexdiff pane. An empty key binds nothing.
+	// Key toggles the rexamine pane. An empty key binds nothing.
 	Key string
 
 	Rex   bool
@@ -34,12 +34,12 @@ type Options struct {
 	Out   io.Writer
 }
 
-// rexRequire is the text that marks an init.lua that already loads rexdiff.
-const rexRequire = `require("rexdiff")`
+// rexRequire is the text that marks an init.lua that already loads rexamine.
+const rexRequire = `require("rexamine")`
 
 // rexMarker starts the lines that setup adds to init.lua, so that uninstall
 // can find them.
-const rexMarker = "-- Added by `rexdiff setup`."
+const rexMarker = "-- Added by `rexamine setup`."
 
 // Run installs the selected parts and reports each step to opts.Out. Running
 // it again updates the files and leaves an existing init.lua line alone.
@@ -59,7 +59,7 @@ func Run(files Files, opts Options) error {
 }
 
 // Refresh rewrites the installed Rex module and agent skills that differ from
-// the files in this binary, so an update that does not run `rexdiff setup`
+// the files in this binary, so an update that does not run `rexamine setup`
 // still brings them up to date. It only touches files that setup installed,
 // and reloads Rex when the module changed.
 func Refresh(files Files) error {
@@ -68,7 +68,7 @@ func Refresh(files Files) error {
 		return err
 	}
 
-	moduleChanged, err := refreshFile(filepath.Join(filepath.Dir(initPath), "rexdiff.lua"), files.RexModule)
+	moduleChanged, err := refreshFile(filepath.Join(filepath.Dir(initPath), "rexamine.lua"), files.RexModule)
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func Refresh(files Files) error {
 		}
 		seen[a.skillsDir] = true
 
-		if _, err := refreshFile(filepath.Join(a.skillsDir, "rexdiff", "SKILL.md"), files.Skill); err != nil {
+		if _, err := refreshFile(filepath.Join(a.skillsDir, "rexamine", "SKILL.md"), files.Skill); err != nil {
 			return err
 		}
 	}
@@ -126,7 +126,7 @@ func installRex(module []byte, opts Options) error {
 		return err
 	}
 
-	modulePath := filepath.Join(dir, "rexdiff.lua")
+	modulePath := filepath.Join(dir, "rexamine.lua")
 	if err := os.WriteFile(modulePath, module, 0o644); err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func installRex(module []byte, opts Options) error {
 
 	// Keep the user's own setup call, which may hold other options.
 	if strings.Contains(string(current), rexRequire) {
-		report(opts.Out, "Rex config", initPath+" already loads rexdiff, left unchanged")
+		report(opts.Out, "Rex config", initPath+" already loads rexamine, left unchanged")
 	} else {
 		// A blank line keeps the added lines apart from the user's own.
 		call := setupCall(opts)
@@ -151,9 +151,9 @@ func installRex(module []byte, opts Options) error {
 		}
 		report(opts.Out, "Rex config", initPath)
 
-		// Rex finds rexdiff on PATH, but a pane does not get what ~/.zshrc adds to PATH.
+		// Rex finds rexamine on PATH, but a pane does not get what ~/.zshrc adds to PATH.
 		if opts.Binary == "" {
-			_, _ = fmt.Fprintln(opts.Out, "  Rex starts rexdiff from a non-interactive shell, which does not read ~/.zshrc.\n  If the pane says \"command not found\", add the directory of rexdiff to PATH in ~/.zshenv.\n  See https://github.com/segersniels/rexdiff/blob/main/docs/install.md#put-rexdiff-on-the-path-that-rex-uses")
+			_, _ = fmt.Fprintln(opts.Out, "  Rex starts rexamine from a non-interactive shell, which does not read ~/.zshrc.\n  If the pane says \"command not found\", add the directory of rexamine to PATH in ~/.zshenv.\n  See https://github.com/segersniels/rexamine/blob/main/docs/install.md#put-rexamine-on-the-path-that-rex-uses")
 		}
 	}
 
@@ -161,12 +161,12 @@ func installRex(module []byte, opts Options) error {
 	return nil
 }
 
-// setupCall builds the lines that init.lua needs to load rexdiff. A Lua error
+// setupCall builds the lines that init.lua needs to load rexamine. A Lua error
 // stops Rex from running the rest of init.lua, so the lines catch an error in
 // the module, for example after a Rex update, and log it instead.
 func setupCall(opts Options) string {
 	var call strings.Builder
-	call.WriteString(rexMarker + " An error in rexdiff does not stop the rest of this file.\n")
+	call.WriteString(rexMarker + " An error in rexamine does not stop the rest of this file.\n")
 	call.WriteString("do\n")
 	call.WriteString("  local ok, err = pcall(function()\n")
 	call.WriteString("    " + rexRequire + ".setup{\n")
@@ -178,7 +178,7 @@ func setupCall(opts Options) string {
 	}
 	call.WriteString("    }\n")
 	call.WriteString("  end)\n")
-	call.WriteString(`  if not ok then rex.log("error", "rexdiff: " .. tostring(err)) end` + "\n")
+	call.WriteString(`  if not ok then rex.log("error", "rexamine: " .. tostring(err)) end` + "\n")
 	call.WriteString("end\n")
 	return call.String()
 }
@@ -220,7 +220,7 @@ func installSkill(skill []byte, out io.Writer) error {
 	}
 
 	for _, dir := range dirs {
-		path := filepath.Join(dir, "rexdiff", "SKILL.md")
+		path := filepath.Join(dir, "rexamine", "SKILL.md")
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
 		}
@@ -254,7 +254,7 @@ func uninstallRex(out io.Writer) error {
 	}
 
 	changed := false
-	modulePath := filepath.Join(filepath.Dir(initPath), "rexdiff.lua")
+	modulePath := filepath.Join(filepath.Dir(initPath), "rexamine.lua")
 	err = os.Remove(modulePath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
@@ -274,13 +274,13 @@ func uninstallRex(out io.Writer) error {
 		if err := os.WriteFile(initPath, []byte(updated), 0o644); err != nil {
 			return err
 		}
-		report(out, "Rex config", "removed rexdiff from "+initPath)
+		report(out, "Rex config", "removed rexamine from "+initPath)
 		changed = true
 	}
 
 	// Lines that the user wrote can hold other options, so only the user can remove them.
 	if strings.Contains(updated, rexRequire) {
-		_, _ = fmt.Fprintf(out, "  %s still loads rexdiff. Remove those lines yourself.\n", initPath)
+		_, _ = fmt.Fprintf(out, "  %s still loads rexamine. Remove those lines yourself.\n", initPath)
 	}
 
 	if changed {
@@ -324,7 +324,7 @@ func uninstallSkill(out io.Writer) error {
 		}
 		seen[a.skillsDir] = true
 
-		dir := filepath.Join(a.skillsDir, "rexdiff")
+		dir := filepath.Join(a.skillsDir, "rexamine")
 		err := os.Remove(filepath.Join(dir, "SKILL.md"))
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
@@ -365,7 +365,7 @@ func installedAgents() ([]agent, error) {
 	return installed, nil
 }
 
-// knownAgents lists the agents that rexdiff can install the skill for. The
+// knownAgents lists the agents that rexamine can install the skill for. The
 // directories follow the skills CLI, github.com/vercel-labs/skills.
 func knownAgents() ([]agent, error) {
 	home, err := os.UserHomeDir()

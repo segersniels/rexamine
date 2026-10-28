@@ -1,4 +1,4 @@
-module github.com/segersniels/rexdiff
+module github.com/segersniels/rexamine
 
 go 1.26.0
 

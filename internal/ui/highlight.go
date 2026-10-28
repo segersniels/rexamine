@@ -9,7 +9,7 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/segersniels/rexdiff/internal/diff"
+	"github.com/segersniels/rexamine/internal/diff"
 )
 
 // span is a part of a code line with the color of its syntax. color is a
@@ -41,7 +41,7 @@ type sourceColorer func(source string) [][]span
 
 // fileColorer picks how to color a file. A tree-sitter grammar parses the
 // code, so it can tell function names, types, and properties apart. Chroma
-// covers the languages that rexdiff has no grammar for. The result is nil
+// covers the languages that rexamine has no grammar for. The result is nil
 // when neither knows the language.
 func fileColorer(path, markdownStyle string) sourceColorer {
 	if highlighter := treeSitterHighlighter(path); highlighter != nil {

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Worktree is a checkout of a repository that rexdiff can show.
+// Worktree is a checkout of a repository that rexamine can show.
 type Worktree struct {
 	Path string
 

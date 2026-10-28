@@ -11,7 +11,7 @@ import (
 
 	"github.com/atotto/clipboard"
 
-	"github.com/segersniels/rexdiff/internal/diff"
+	"github.com/segersniels/rexamine/internal/diff"
 )
 
 // Snippet is a range of diff lines in one file that a comment is about.

@@ -58,7 +58,7 @@ func TestLatestVersionUsesAFreshCache(t *testing.T) {
 }
 
 func TestLatestVersionRefreshesAStaleCache(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "rexdiff", "update.json")
+	path := filepath.Join(t.TempDir(), "rexamine", "update.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -77,14 +77,14 @@ func TestLatestVersionRefreshesAStaleCache(t *testing.T) {
 }
 
 func TestCommandForMatchesTheInstallation(t *testing.T) {
-	script := "curl -fsSL https://raw.githubusercontent.com/segersniels/rexdiff/main/scripts/install.sh | "
+	script := "curl -fsSL https://raw.githubusercontent.com/segersniels/rexamine/main/scripts/install.sh | "
 	tests := []struct {
 		name, path, want string
 	}{
-		{"npm", "/opt/homebrew/lib/node_modules/@segersniels/rexdiff-darwin-arm64/bin/rexdiff", "npm install -g @segersniels/rexdiff && rexdiff setup"},
-		{"script default", "/Users/me/.local/bin/rexdiff", script + "sh"},
-		{"script elsewhere", "/usr/local/bin/rexdiff", script + "REXDIFF_INSTALL_DIR=/usr/local/bin sh"},
-		{"path with a space", "/Users/me/my tools/rexdiff", script + "REXDIFF_INSTALL_DIR='/Users/me/my tools' sh"},
+		{"npm", "/opt/homebrew/lib/node_modules/@segersniels/rexamine-darwin-arm64/bin/rexamine", "npm install -g @segersniels/rexamine && rexamine setup"},
+		{"script default", "/Users/me/.local/bin/rexamine", script + "sh"},
+		{"script elsewhere", "/usr/local/bin/rexamine", script + "REXAMINE_INSTALL_DIR=/usr/local/bin sh"},
+		{"path with a space", "/Users/me/my tools/rexamine", script + "REXAMINE_INSTALL_DIR='/Users/me/my tools' sh"},
 	}
 
 	for _, tt := range tests {

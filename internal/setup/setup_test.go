@@ -54,17 +54,17 @@ func TestRunInstallsEverything(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opts := Options{Binary: "/opt/bin/rexdiff", Key: "ctrl+alt+cmd+d", Rex: true, Skill: true, Out: &bytes.Buffer{}}
+	opts := Options{Binary: "/opt/bin/rexamine", Key: "ctrl+alt+cmd+d", Rex: true, Skill: true, Out: &bytes.Buffer{}}
 	for range 2 {
 		if err := Run(testFiles, opts); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	if got := readFile(t, filepath.Join(dir, "config", "rex", "rexdiff.lua")); got != "-- module\n" {
+	if got := readFile(t, filepath.Join(dir, "config", "rex", "rexamine.lua")); got != "-- module\n" {
 		t.Errorf("Rex module is %q", got)
 	}
-	if got := readFile(t, filepath.Join(dir, "claude", "skills", "rexdiff", "SKILL.md")); got != "# skill\n" {
+	if got := readFile(t, filepath.Join(dir, "claude", "skills", "rexamine", "SKILL.md")); got != "# skill\n" {
 		t.Errorf("skill is %q", got)
 	}
 
@@ -73,9 +73,9 @@ func TestRunInstallsEverything(t *testing.T) {
 		t.Errorf("init.lua lost its existing content:\n%s", init)
 	}
 	if strings.Count(init, rexRequire) != 1 {
-		t.Errorf("init.lua loads rexdiff %d times, want once:\n%s", strings.Count(init, rexRequire), init)
+		t.Errorf("init.lua loads rexamine %d times, want once:\n%s", strings.Count(init, rexRequire), init)
 	}
-	for _, want := range []string{`bin = "/opt/bin/rexdiff"`, `key = "ctrl+alt+cmd+d"`, "pcall(function()"} {
+	for _, want := range []string{`bin = "/opt/bin/rexamine"`, `key = "ctrl+alt+cmd+d"`, "pcall(function()"} {
 		if !strings.Contains(init, want) {
 			t.Errorf("init.lua does not contain %s:\n%s", want, init)
 		}
@@ -98,7 +98,7 @@ func TestRunWithoutABinaryLetsRexUsePath(t *testing.T) {
 func TestRunWithoutAKeyBindsNothing(t *testing.T) {
 	dir := useTempConfig(t)
 
-	opts := Options{Binary: "/opt/bin/rexdiff", Rex: true, Out: &bytes.Buffer{}}
+	opts := Options{Binary: "/opt/bin/rexamine", Rex: true, Out: &bytes.Buffer{}}
 	if err := Run(testFiles, opts); err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestSkillGoesToEveryInstalledAgent(t *testing.T) {
 		filepath.Join(dir, ".agents", "skills"),
 		filepath.Join(dir, "config", "opencode", "skills"),
 	} {
-		if got := readFile(t, filepath.Join(skillsDir, "rexdiff", "SKILL.md")); got != "# skill\n" {
+		if got := readFile(t, filepath.Join(skillsDir, "rexamine", "SKILL.md")); got != "# skill\n" {
 			t.Errorf("skill in %s is %q", skillsDir, got)
 		}
 	}
@@ -156,7 +156,7 @@ func TestSkillWithoutAnAgentInstallsNothing(t *testing.T) {
 }
 
 func TestLuaString(t *testing.T) {
-	if got := luaString(`C:\tools\"rexdiff"`); got != `"C:\\tools\\\"rexdiff\""` {
+	if got := luaString(`C:\tools\"rexamine"`); got != `"C:\\tools\\\"rexamine\""` {
 		t.Errorf("got %s", got)
 	}
 }
@@ -173,7 +173,7 @@ func TestUninstallRemovesEverythingThatRunInstalled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	opts := Options{Binary: "/opt/bin/rexdiff", Key: "ctrl+alt+cmd+d", Rex: true, Skill: true, Out: &bytes.Buffer{}}
+	opts := Options{Binary: "/opt/bin/rexamine", Key: "ctrl+alt+cmd+d", Rex: true, Skill: true, Out: &bytes.Buffer{}}
 	if err := Run(testFiles, opts); err != nil {
 		t.Fatal(err)
 	}
@@ -191,9 +191,9 @@ func TestUninstallRemovesEverythingThatRunInstalled(t *testing.T) {
 		t.Errorf("init.lua is %q, want %q", got, original)
 	}
 	for _, path := range []string{
-		filepath.Join(dir, "config", "rex", "rexdiff.lua"),
-		filepath.Join(dir, "claude", "skills", "rexdiff"),
-		filepath.Join(dir, ".agents", "skills", "rexdiff"),
+		filepath.Join(dir, "config", "rex", "rexamine.lua"),
+		filepath.Join(dir, "claude", "skills", "rexamine"),
+		filepath.Join(dir, ".agents", "skills", "rexamine"),
 	} {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Errorf("%s still exists", path)
@@ -208,20 +208,20 @@ func TestRemoveSetupCall(t *testing.T) {
 	}{
 		{
 			name:    "current format",
-			text:    "a = 1\n\n" + setupCall(Options{Binary: "/bin/rexdiff", Key: "k"}) + "b = 2\n",
+			text:    "a = 1\n\n" + setupCall(Options{Binary: "/bin/rexamine", Key: "k"}) + "b = 2\n",
 			want:    "a = 1\nb = 2\n",
 			removed: true,
 		},
 		{
 			name:    "older format",
-			text:    "-- Added by `rexdiff setup`.\nrequire(\"rexdiff\").setup{\n  bin = \"/bin/rexdiff\",\n}\n",
+			text:    "-- Added by `rexamine setup`.\nrequire(\"rexamine\").setup{\n  bin = \"/bin/rexamine\",\n}\n",
 			want:    "",
 			removed: true,
 		},
 		{
 			name: "lines that the user wrote",
-			text: "require(\"rexdiff\").setup{}\n",
-			want: "require(\"rexdiff\").setup{}\n",
+			text: "require(\"rexamine\").setup{}\n",
+			want: "require(\"rexamine\").setup{}\n",
 		},
 	}
 	for _, tt := range tests {
@@ -242,7 +242,7 @@ func TestRefreshUpdatesOnlyInstalledFiles(t *testing.T) {
 	}
 
 	// Cursor's skill was removed by hand, so the refresh must not bring it back.
-	cursorSkill := filepath.Join(dir, ".cursor", "skills", "rexdiff", "SKILL.md")
+	cursorSkill := filepath.Join(dir, ".cursor", "skills", "rexamine", "SKILL.md")
 	if err := os.Remove(cursorSkill); err != nil {
 		t.Fatal(err)
 	}
@@ -251,10 +251,10 @@ func TestRefreshUpdatesOnlyInstalledFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := readFile(t, filepath.Join(dir, "config", "rex", "rexdiff.lua")); got != string(testFiles.RexModule) {
+	if got := readFile(t, filepath.Join(dir, "config", "rex", "rexamine.lua")); got != string(testFiles.RexModule) {
 		t.Errorf("module is %q, want the new module", got)
 	}
-	if got := readFile(t, filepath.Join(dir, "claude", "skills", "rexdiff", "SKILL.md")); got != string(testFiles.Skill) {
+	if got := readFile(t, filepath.Join(dir, "claude", "skills", "rexamine", "SKILL.md")); got != string(testFiles.Skill) {
 		t.Errorf("skill is %q, want the new skill", got)
 	}
 	if _, err := os.Stat(cursorSkill); err == nil {
@@ -269,7 +269,7 @@ func TestRefreshWithoutSetupInstallsNothing(t *testing.T) {
 	if err := Refresh(testFiles); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "config", "rex", "rexdiff.lua")); err == nil {
+	if _, err := os.Stat(filepath.Join(dir, "config", "rex", "rexamine.lua")); err == nil {
 		t.Error("refresh installed the module without setup")
 	}
 }

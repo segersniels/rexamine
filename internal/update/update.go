@@ -1,4 +1,4 @@
-// Package update finds out whether a newer release of rexdiff exists, and
+// Package update finds out whether a newer release of rexamine exists, and
 // how the user can install it.
 package update
 
@@ -14,7 +14,7 @@ import (
 )
 
 // latestReleaseURL is the GitHub API endpoint for the newest release.
-const latestReleaseURL = "https://api.github.com/repos/segersniels/rexdiff/releases/latest"
+const latestReleaseURL = "https://api.github.com/repos/segersniels/rexamine/releases/latest"
 
 // checkInterval is how long a check stays valid. GitHub allows 60 requests an
 // hour without a token, so one check an hour stays far below the limit and
@@ -60,7 +60,7 @@ func cacheDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "rexdiff"), nil
+	return filepath.Join(dir, "rexamine"), nil
 }
 
 // RemoveCache removes the saved answer of the check, for an uninstall.
@@ -165,7 +165,7 @@ func Command() string {
 	return commandFor(binary, home)
 }
 
-// Binary finds the file of this rexdiff binary, after symbolic links.
+// Binary finds the file of this rexamine binary, after symbolic links.
 func Binary() (string, error) {
 	binary, err := os.Executable()
 	if err != nil {
@@ -186,7 +186,7 @@ func InstalledWithNpm(path string) bool {
 // the Rex module and the agent skill.
 func commandFor(path, home string) string {
 	if InstalledWithNpm(path) {
-		return "npm install -g @segersniels/rexdiff && rexdiff setup"
+		return "npm install -g @segersniels/rexamine && rexamine setup"
 	}
 
 	// The script installs to ~/.local/bin by default. Elsewhere, it must replace the binary in its own directory.
@@ -200,7 +200,7 @@ func commandFor(path, home string) string {
 // scriptCommand gives the one-line install script, with the install
 // directory when it is not the default.
 func scriptCommand(dir string) string {
-	command := "curl -fsSL https://raw.githubusercontent.com/segersniels/rexdiff/main/scripts/install.sh | "
+	command := "curl -fsSL https://raw.githubusercontent.com/segersniels/rexamine/main/scripts/install.sh | "
 	if dir == "" {
 		return command + "sh"
 	}
@@ -209,5 +209,5 @@ func scriptCommand(dir string) string {
 	if strings.ContainsAny(dir, " '\"$`\\&;|<>()*?[]#~") {
 		dir = "'" + strings.ReplaceAll(dir, "'", `'\''`) + "'"
 	}
-	return command + "REXDIFF_INSTALL_DIR=" + dir + " sh"
+	return command + "REXAMINE_INSTALL_DIR=" + dir + " sh"
 }

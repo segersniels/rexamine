@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// prFields lists the pull request fields that rexdiff asks gh for.
+// prFields lists the pull request fields that rexamine asks gh for.
 const prFields = "number,title,url,state,isDraft,author,updatedAt,baseRefName,headRefName,headRefOid,reviewDecision,reviewRequests,reviews,labels,body"
 
 // Author is the GitHub account that wrote something.

@@ -1,23 +1,23 @@
---- Rex integration for rexdiff.
+--- Rex integration for rexamine.
 ---
---- Adds a "rexdiff" action that opens rexdiff in a pane beside the focused
---- pane, or closes it when it is already open. Comments written in rexdiff
+--- Adds a "rexamine" action that opens rexamine in a pane beside the focused
+--- pane, or closes it when it is already open. Comments written in rexamine
 --- are pasted into the pane it opened beside, such as a Claude Code or Codex session.
 ---
 --- Usage in ~/.config/rex/init.lua:
 ---
----   require("rexdiff").setup{ key = "ctrl+alt+cmd+d" }
+---   require("rexamine").setup{ key = "ctrl+alt+cmd+d" }
 ---
 --- Then press the key for the local changes, or run the action with a pull
---- request: rex do rexdiff pr=https://github.com/owner/repo/pull/123
+--- request: rex do rexamine pr=https://github.com/owner/repo/pull/123
 --- Give a directory to show the local changes of another checkout, such as a
---- worktree that an agent works in: rex do rexdiff dir=/path/to/worktree
+--- worktree that an agent works in: rex do rexamine dir=/path/to/worktree
 local M = {}
 
---- Labels the rexdiff pane, so the action can find it again.
-local LABEL = "rexdiff"
+--- Labels the rexamine pane, so the action can find it again.
+local LABEL = "rexamine"
 
---- Finds the open rexdiff pane in the tab of the anchor pane, or in the shown
+--- Finds the open rexamine pane in the tab of the anchor pane, or in the shown
 --- tab without an anchor. Each tab keeps its own pane, so that agents in
 --- different tabs do not close each other's pane.
 local function find_pane(session_id, anchor_id)
@@ -50,21 +50,21 @@ local function pane_dir(block_id)
   return os.getenv("HOME")
 end
 
---- Registers the rexdiff action.
+--- Registers the rexamine action.
 ---
 --- Options:
----   bin    Path to the rexdiff binary. Rex starts it from a non-interactive
+---   bin    Path to the rexamine binary. Rex starts it from a non-interactive
 ---          shell, so set a full path when the binary is not on that PATH.
----          Defaults to "rexdiff".
+---          Defaults to "rexamine".
 ---   key    A key that toggles the pane, such as "ctrl+alt+cmd+d".
 ---   ratio  The share of the width that the focused pane keeps. Defaults to 0.55.
 function M.setup(opts)
   opts = opts or {}
-  local bin = opts.bin or "rexdiff"
+  local bin = opts.bin or "rexamine"
   local ratio = opts.ratio or 0.55
 
   rex.action{
-    name        = "rexdiff",
+    name        = "rexamine",
     title       = "Toggle Diff Review",
     description = "Review the local changes, or a pull request, beside the focused pane.",
     keywords    = "diff review pull request pr",
@@ -100,7 +100,7 @@ function M.setup(opts)
     end,
   }
 
-  if opts.key then rex.bind(opts.key, "rexdiff") end
+  if opts.key then rex.bind(opts.key, "rexamine") end
 end
 
 return M

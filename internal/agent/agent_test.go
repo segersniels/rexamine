@@ -3,7 +3,7 @@ package agent
 import (
 	"testing"
 
-	"github.com/segersniels/rexdiff/internal/diff"
+	"github.com/segersniels/rexamine/internal/diff"
 )
 
 func TestLocation(t *testing.T) {

@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest a new feature or a change to rexdiff.
+description: Suggest a new feature or a change to rexamine.
 labels: [enhancement]
 body:
   - type: textarea
@@ -13,7 +13,7 @@ body:
     id: solution
     attributes:
       label: Proposed solution
-      description: Describe how rexdiff could help. Mockups and examples from other tools are welcome.
+      description: Describe how rexamine could help. Mockups and examples from other tools are welcome.
   - type: textarea
     id: alternatives
     attributes:

@@ -7,7 +7,7 @@ import (
 	"github.com/odvcencio/gotreesitter/grammars"
 )
 
-// treeSitterLanguages lists the languages that rexdiff colors with tree-sitter.
+// treeSitterLanguages lists the languages that rexamine colors with tree-sitter.
 // Chroma keeps the languages whose grammars do worse on the parts of a file
 // that a diff shows: Markdown and HTML need nested grammars for inline text
 // and embedded scripts, PHP needs the "<?php" tag that most hunks leave out,

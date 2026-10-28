@@ -285,7 +285,7 @@ func TestLastTurnHeaderShowsTheStateOfTheTurn(t *testing.T) {
 	}{
 		{"before the first turn", Local{}, "turn start", "working tree · waiting for the next turn"},
 		{"working", Local{TurnStart: start, TurnStartedAt: time.Now().Add(-3 * time.Minute)}, "turn start", "working tree · agent working, started 3m ago"},
-		{"joined", Local{TurnStart: start, TurnStartedAt: time.Now(), JoinedTurn: true}, "rexdiff opened", "working tree · agent working"},
+		{"joined", Local{TurnStart: start, TurnStartedAt: time.Now(), JoinedTurn: true}, "rexamine opened", "working tree · agent working"},
 		{"ended", Local{TurnStart: start, TurnEndedAt: time.Now()}, "turn start", "working tree · turn ended just now"},
 	}
 	for _, tt := range tests {

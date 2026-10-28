@@ -8,12 +8,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/segersniels/rexdiff/internal/agent"
-	"github.com/segersniels/rexdiff/internal/config"
-	"github.com/segersniels/rexdiff/internal/diff"
-	"github.com/segersniels/rexdiff/internal/github"
-	"github.com/segersniels/rexdiff/internal/source"
-	"github.com/segersniels/rexdiff/internal/update"
+	"github.com/segersniels/rexamine/internal/agent"
+	"github.com/segersniels/rexamine/internal/config"
+	"github.com/segersniels/rexamine/internal/diff"
+	"github.com/segersniels/rexamine/internal/github"
+	"github.com/segersniels/rexamine/internal/source"
+	"github.com/segersniels/rexamine/internal/update"
 )
 
 const testDiff = `diff --git a/src/settings-mapper.ts b/src/settings-mapper.ts
@@ -415,7 +415,7 @@ func TestUpdateNoticeWrapsInNarrowScreens(t *testing.T) {
 		model, _ = model.Update(notice)
 		view := model.View().Content
 
-		if !strings.Contains(ansi.Strip(view), "rexdiff 9.9.9") {
+		if !strings.Contains(ansi.Strip(view), "rexamine 9.9.9") {
 			t.Errorf("width %d: view does not show the notice", width)
 		}
 		for i, line := range strings.Split(view, "\n") {
@@ -423,7 +423,7 @@ func TestUpdateNoticeWrapsInNarrowScreens(t *testing.T) {
 				t.Errorf("width %d: line %d is %d columns wide: %q", width, i+1, got, ansi.Strip(line))
 			}
 		}
-		if width == 200 && !strings.Contains(ansi.Strip(view), "`rexdiff update`") {
+		if width == 200 && !strings.Contains(ansi.Strip(view), "`rexamine update`") {
 			t.Errorf("view does not show the whole update command:\n%s", ansi.Strip(view))
 		}
 	}
@@ -447,7 +447,7 @@ func TestTurnEventsTrackTheAgentsTurn(t *testing.T) {
 	turns := make(chan agent.TurnEvent)
 	var model tea.Model = New(source.Local{}, &fakeSender{}, turns, "dark", config.Config{})
 
-	// rexdiff opened while the agent worked, so it saves the working tree from now.
+	// rexamine opened while the agent worked, so it saves the working tree from now.
 	model, cmd := model.Update(turnMsg{agent.TurnJoined})
 	local := model.(Model).source.(source.Local)
 	if !local.JoinedTurn || local.TurnStartedAt.IsZero() || cmd == nil {
