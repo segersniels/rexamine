@@ -5,8 +5,8 @@
 #
 #   scripts/demo/demo.sh [output directory]
 #
-# It writes demo.mp4 and demo.gif to the output directory, the assets
-# directory of the repository by default. It needs:
+# It writes demo.gif to the output directory, the assets directory of the
+# repository by default. It needs:
 #   - Rex with Remote Control on, in Settings under Rex Server
 #   - rexamine set up in Rex, with `rexamine setup`
 #   - permission for the terminal to record the screen
@@ -26,6 +26,9 @@ home_session="${REX_SESSION:-}"
 work="$(mktemp -d)"
 repo="$work/acme-api"
 take="$work/take.mov"
+
+# The cut video, which the GIF is made from.
+video="$work/demo.mp4"
 
 # The comment that the demo types into rexamine.
 comment="This retries forever. Cap it at 3 attempts with backoff."
@@ -161,11 +164,11 @@ ffmpeg -v error -y -i "$take" -filter_complex "\
 [c]trim=11.3:14.0,setpts=(PTS-STARTPTS)/1.5[answer];\
 [d]trim=14.0:16.3,setpts=PTS-STARTPTS[update];\
 [open][typing][answer][update]concat=n=4:v=1:a=0,fps=30[v]" \
-  -map "[v]" -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart "$out_dir/demo.mp4"
+  -map "[v]" -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -movflags +faststart "$video"
 
-ffmpeg -v error -y -i "$out_dir/demo.mp4" -vf "\
+ffmpeg -v error -y -i "$video" -vf "\
 fps=15,scale=1280:-1:flags=lanczos,split[s0][s1];\
 [s0]palettegen=max_colors=128:stats_mode=diff[p];\
 [s1][p]paletteuse=dither=none:diff_mode=rectangle" "$out_dir/demo.gif"
 
-echo "rexamine demo: wrote $out_dir/demo.mp4 and $out_dir/demo.gif"
+echo "rexamine demo: wrote $out_dir/demo.gif"

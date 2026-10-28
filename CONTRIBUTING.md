@@ -59,7 +59,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org): `type(scope): d
 
 ## Record the demo video
 
-`scripts/demo/demo.sh` records the demo of rexamine in the Rex app and writes `assets/demo.mp4` and `assets/demo.gif`. A stand-in agent in `scripts/demo/agent.py` takes the comment and fixes the file, so every take is the same. Read the top of the script for what it needs, such as Remote Control in Rex. To make another demo, change the files in `scripts/demo/fixtures`, the comment, and the key presses in the script.
+`scripts/demo/demo.sh` records the demo of rexamine in the Rex app and writes `assets/demo.gif`. A stand-in agent in `scripts/demo/agent.py` takes the comment and fixes the file, so every take is the same. Read the top of the script for what it needs, such as Remote Control in Rex. To make another demo, change the files in `scripts/demo/fixtures`, the comment, and the key presses in the script.
 
 ## Release a version
 
