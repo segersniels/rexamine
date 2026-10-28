@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/segersniels/rexamine/raw/main/assets/screenshot.png" alt="rexamine in a Rex pane beside a Claude Code session" width="100%">
+  <img src="https://github.com/segersniels/rexamine/raw/main/assets/demo.gif" alt="rexamine beside a coding agent in Rex: a comment on the diff goes to the agent, and the agent's fix shows up in the diff" width="100%">
 </p>
 
 rexamine is a terminal diff viewer for [Rex](https://www.superlogical.com/rex). It opens in a pane next to your agent session, such as Claude Code. Select lines, write a question or a remark, and press Enter. rexamine pastes the file, the line numbers, the selected lines, and your comment into the agent's prompt, so you can keep the conversation in the session you already have.
