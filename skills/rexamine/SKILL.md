@@ -13,7 +13,7 @@ rexamine shows a diff in a Rex pane beside this session. The user selects lines 
 rex do -s "$REX_SESSION" -b "$REX_BLOCK" rexamine pr=<PR URL or number>
 ```
 
-- Leave out `pr=` to show the local changes of the current branch. The user can press `t` in the pane to switch to uncommitted changes only, or to the changes of your last turn. The user can press `p` to switch between the local changes and the pull request of the branch.
+- Leave out `pr=` to show the local changes of the current branch. The user can press `t` in the pane to switch to uncommitted changes only, or to the changes of your last turn. The user can press `p` to switch between the local changes and the pull request of the branch. The user can press `B` to choose another base branch for the branch changes.
 - The local changes compare with the default branch, such as `origin/main`. When the current branch is stacked on another branch, add `base=<parent branch>`, such as `base=origin/feature-parent`, so the pane shows only the changes of this branch. Do this without being asked when you know the parent branch, for example from the pull request base (`gh pr view --json baseRefName`) or from the branch that you created this branch from.
 - Run the command again with `pr=` to show another pull request. Run it without `pr=`, `dir=`, or `base=` to close the pane.
 - The pane shows the checkout that your process started in. When you start to work in another worktree or checkout, run the command with `dir="$PWD"` from that directory, so the pane shows your changes there. Do this without being asked.
