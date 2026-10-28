@@ -50,6 +50,10 @@ func (s Scope) String() string {
 type Local struct {
 	Scope Scope
 
+	// Base is the branch that the branch scope compares with, or empty for
+	// the default branch. A stacked branch compares with its parent branch.
+	Base string
+
 	// Dir is a directory in the repository, or empty for the working directory.
 	Dir string
 
@@ -104,16 +108,19 @@ func (l Local) Load() (Review, error) {
 		}
 		base, baseName = strings.TrimSpace(emptyTree), "no commits"
 	} else if l.Scope == Branch {
-		defaultBranch, err := defaultBranch(root)
-		if err != nil {
-			return Review{}, err
+		baseBranch := l.Base
+		if baseBranch == "" {
+			baseBranch, err = defaultBranch(root)
+			if err != nil {
+				return Review{}, err
+			}
 		}
 
-		mergeBase, err := git(root, "merge-base", "HEAD", defaultBranch)
+		mergeBase, err := git(root, "merge-base", "HEAD", baseBranch)
 		if err != nil {
-			return Review{}, fmt.Errorf("find where %s split from %s: %w", branch, defaultBranch, err)
+			return Review{}, fmt.Errorf("find where %s split from %s: %w", branch, baseBranch, err)
 		}
-		base, baseName, headName = strings.TrimSpace(mergeBase), defaultBranch, branch
+		base, baseName, headName = strings.TrimSpace(mergeBase), baseBranch, branch
 	}
 
 	tracked, err := git(root, "diff", "--no-color", "--no-ext-diff", "-M", base)

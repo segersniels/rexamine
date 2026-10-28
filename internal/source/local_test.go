@@ -84,6 +84,26 @@ func TestLocalScopes(t *testing.T) {
 	}
 }
 
+func TestLocalBranchComparesWithTheBase(t *testing.T) {
+	t.Chdir(newRepo(t))
+
+	// The feature branch is its own base here, so its commit is not a change.
+	review, err := Local{Scope: Branch, Base: "feature"}.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(review.Diff, "b/committed.txt") {
+		t.Errorf("diff shows a commit that the base has:\n%s", review.Diff)
+	}
+	if !strings.Contains(review.Diff, "b/base.txt") {
+		t.Errorf("diff does not show the uncommitted change:\n%s", review.Diff)
+	}
+	if review.Base != "feature" {
+		t.Errorf("base = %q, want feature", review.Base)
+	}
+}
+
 func TestLocalWithoutCommits(t *testing.T) {
 	t.Chdir(t.TempDir())
 

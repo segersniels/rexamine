@@ -8,6 +8,7 @@
 ```sh
 rexamine                  # the changes on the current branch
 rexamine --uncommitted    # only the uncommitted changes
+rexamine --base origin/feature-parent  # a stacked branch, compared to its parent branch
 rexamine 123              # pull request 123 of the current repository
 rexamine https://github.com/owner/repo/pull/123
 ```

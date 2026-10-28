@@ -12,6 +12,8 @@
 --- request: rex do rexamine pr=https://github.com/owner/repo/pull/123
 --- Give a directory to show the local changes of another checkout, such as a
 --- worktree that an agent works in: rex do rexamine dir=/path/to/worktree
+--- Give a base branch to compare a stacked branch with its parent branch:
+--- rex do rexamine base=origin/feature-parent
 local M = {}
 
 --- Labels the rexamine pane, so the action can find it again.
@@ -68,18 +70,22 @@ function M.setup(opts)
     title       = "Toggle Diff Review",
     description = "Review the local changes, or a pull request, beside the focused pane.",
     keywords    = "diff review pull request pr",
-    args        = { pr = "string?", dir = "string?" },
+    args        = { pr = "string?", dir = "string?", base = "string?" },
     run         = function(ctx, args)
       local open = find_pane(ctx.session_id, ctx.block_id)
       if open then rex.call("block.close", { session_id = ctx.session_id, block_id = open }) end
 
-      -- Without a pull request or a directory the action toggles, so a second key press only closes the pane.
-      if open and not args.pr and not args.dir then return { closed = open } end
+      -- Without a pull request, a directory, or a base the action toggles, so a second key press only closes the pane.
+      if open and not args.pr and not args.dir and not args.base then return { closed = open } end
 
       local command = { bin }
       if ctx.block_id then
         table.insert(command, "--agent")
         table.insert(command, ctx.block_id)
+      end
+      if args.base then
+        table.insert(command, "--base")
+        table.insert(command, args.base)
       end
       if args.pr then table.insert(command, args.pr) end
 

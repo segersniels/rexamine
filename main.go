@@ -41,7 +41,8 @@ const usage = `Usage: rexamine [flags] [<pr-number> | <pr-url>]
        rexamine update
        rexamine uninstall
 
-Shows the changes on the current branch compared to the default branch.
+Shows the changes on the current branch compared to the default branch, or
+to the branch that --base names.
 Give a pull request number or URL to show that pull request instead.
 
 Run "rexamine setup" once to add rexamine to Rex and to install the agent skill.
@@ -79,6 +80,7 @@ func run() int {
 	flags := flag.NewFlagSet("rexamine", flag.ContinueOnError)
 	agentPane := flags.String("agent", "", "send comments to the Rex pane with this `block` ID instead of the clipboard")
 	uncommitted := flags.Bool("uncommitted", false, "start with uncommitted changes instead of the whole branch")
+	base := flags.String("base", "", "compare the branch with this `branch` instead of the default branch, such as the parent of a stacked branch")
 	showVersion := flags.Bool("version", false, "print the version and exit")
 	flags.Usage = func() {
 		_, _ = fmt.Fprint(flags.Output(), usage)
@@ -100,7 +102,7 @@ func run() int {
 		return 2
 	}
 
-	src, err := chooseSource(flags.Arg(0), *uncommitted)
+	src, err := chooseSource(flags.Arg(0), *uncommitted, *base)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "rexamine:", err)
 		return 1
@@ -147,7 +149,7 @@ func run() int {
 
 // chooseSource picks what to show and checks that the tool it needs is
 // installed, before the screen opens.
-func chooseSource(target string, uncommitted bool) (source.Source, error) {
+func chooseSource(target string, uncommitted bool, base string) (source.Source, error) {
 	if target != "" {
 		if _, err := exec.LookPath("gh"); err != nil {
 			return nil, errors.New("pull requests need the GitHub CLI: https://cli.github.com")
@@ -163,7 +165,7 @@ func chooseSource(target string, uncommitted bool) (source.Source, error) {
 	if uncommitted {
 		scope = source.Uncommitted
 	}
-	return source.Local{Scope: scope}, nil
+	return source.Local{Scope: scope, Base: base}, nil
 }
 
 // runSetup installs the Rex module and the agent skill.
