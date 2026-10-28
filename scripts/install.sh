@@ -63,7 +63,8 @@ main() {
   need tar
   need uname
 
-  install_dir="${REXAMINE_INSTALL_DIR:-$HOME/.local/bin}"
+  # `rexdiff update`, from before the rename, sets REXDIFF_INSTALL_DIR.
+  install_dir="${REXAMINE_INSTALL_DIR:-${REXDIFF_INSTALL_DIR:-$HOME/.local/bin}}"
   base_url="https://github.com/$REPO/releases/latest/download"
   if [ -n "${REXAMINE_VERSION:-}" ]; then
     base_url="https://github.com/$REPO/releases/download/v${REXAMINE_VERSION#v}"
@@ -91,6 +92,13 @@ main() {
   chmod 755 "$tmp_dir/rexamine"
   mv "$tmp_dir/rexamine" "$install_dir/rexamine"
   say "installed $("$install_dir/rexamine" --version) to $install_dir/rexamine"
+
+  # rexamine replaces rexdiff, its name before the rename. The binary of
+  # github.com/rednafi/rexdiff has the same name, so check the Go module path.
+  if [ -f "$install_dir/rexdiff" ] && grep -q 'github.com/segersniels/rexdiff' "$install_dir/rexdiff"; then
+    rm -f "$install_dir/rexdiff"
+    say "removed the old rexdiff binary from $install_dir"
+  fi
 
   if [ "${REXAMINE_NO_SETUP:-}" != 1 ]; then
     echo

@@ -4,6 +4,7 @@ package setup
 
 import (
 	"bytes"
+	"debug/buildinfo"
 	"errors"
 	"fmt"
 	"io"
@@ -41,13 +42,39 @@ const rexRequire = `require("rexamine")`
 // can find them.
 const rexMarker = "-- Added by `rexamine setup`."
 
+// legacyName is the name of rexamine before the rename. Setup removes what
+// `rexdiff setup` installed, because the old module binds the same key.
+// github.com/rednafi/rexdiff is another tool with the same name and file
+// names, so setup only removes a file that it can identify as its own.
+const legacyName = "rexdiff"
+
+// legacyMarker starts the lines that `rexdiff setup` added to init.lua.
+const legacyMarker = "-- Added by `rexdiff setup`."
+
+// legacyModuleHeader starts every Rex module that `rexdiff setup` installed.
+const legacyModuleHeader = "--- Rex integration for rexdiff."
+
+// legacySkillHeader starts every agent skill that `rexdiff setup` installed.
+const legacySkillHeader = "---\nname: rexdiff\ndescription: Open a diff review pane beside this session in Rex"
+
+// legacyModulePath is the Go module path inside the old rexdiff binary.
+const legacyModulePath = "github.com/segersniels/rexdiff"
+
 // Run installs the selected parts and reports each step to opts.Out. Running
 // it again updates the files and leaves an existing init.lua line alone.
 func Run(files Files, opts Options) error {
+	legacyRemoved, err := removeLegacy(opts.Out)
+	if err != nil {
+		return fmt.Errorf("remove the old rexdiff install: %w", err)
+	}
+
+	// Installing the Rex module reloads Rex too, so reload only when setup skips it.
 	if opts.Rex {
 		if err := installRex(files.RexModule, opts); err != nil {
 			return fmt.Errorf("install the Rex module: %w", err)
 		}
+	} else if legacyRemoved {
+		reloadRex(opts.Out)
 	}
 
 	if opts.Skill {
@@ -56,6 +83,112 @@ func Run(files Files, opts Options) error {
 		}
 	}
 	return nil
+}
+
+// removeLegacy removes the Rex module, the init.lua lines, and the agent skill
+// that `rexdiff setup` installed, and reports whether it changed the Rex
+// configuration.
+func removeLegacy(out io.Writer) (bool, error) {
+	initPath, err := rexInitPath()
+	if err != nil {
+		return false, err
+	}
+
+	modulePath := filepath.Join(filepath.Dir(initPath), legacyName+".lua")
+	moduleRemoved, err := removeIfStartsWith(modulePath, legacyModuleHeader)
+	if err != nil {
+		return false, err
+	}
+	if moduleRemoved {
+		report(out, "Old Rex module", "removed "+modulePath)
+	}
+
+	current, err := os.ReadFile(initPath)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return false, err
+	}
+
+	updated, callRemoved := removeSetupCall(string(current), legacyMarker)
+	if callRemoved {
+		if err := os.WriteFile(initPath, []byte(updated), 0o644); err != nil {
+			return false, err
+		}
+		report(out, "Old Rex config", "removed rexdiff from "+initPath)
+	}
+
+	// Lines that the user wrote now load a module that is gone, so Rex logs an error.
+	if moduleRemoved && strings.Contains(updated, `require("rexdiff")`) {
+		_, _ = fmt.Fprintf(out, "  %s still loads rexdiff. Change require(\"rexdiff\") to require(\"rexamine\") in those lines.\n", initPath)
+	}
+
+	agents, err := knownAgents()
+	if err != nil {
+		return false, err
+	}
+
+	seen := map[string]bool{}
+	for _, a := range agents {
+		if seen[a.skillsDir] {
+			continue
+		}
+		seen[a.skillsDir] = true
+
+		dir := filepath.Join(a.skillsDir, legacyName)
+		removed, err := removeIfStartsWith(filepath.Join(dir, "SKILL.md"), legacySkillHeader)
+		if err != nil {
+			return false, err
+		}
+		if !removed {
+			continue
+		}
+
+		// The directory stays when it holds files that the user added.
+		_ = os.Remove(dir)
+		report(out, "Old agent skill", "removed "+dir)
+	}
+
+	// npm or the install script put the old binary there, so only the user knows how to remove it.
+	if path, ok := legacyBinary(); ok {
+		_, _ = fmt.Fprintf(out, "  The old rexdiff binary is still at %s. Remove it, or run `npm uninstall -g @segersniels/rexdiff` if npm installed it.\n", path)
+	}
+	return moduleRemoved || callRemoved, nil
+}
+
+// removeIfStartsWith removes the file at path when its content starts with
+// header, and reports whether it removed the file.
+func removeIfStartsWith(path, header string) (bool, error) {
+	content, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !bytes.HasPrefix(content, []byte(header)) {
+		return false, nil
+	}
+	return true, os.Remove(path)
+}
+
+// legacyBinary finds the old rexdiff binary on PATH. The binary of
+// github.com/rednafi/rexdiff has the same name, so it checks the Go module
+// path in a binary from the install script, and the package path of a binary
+// from npm.
+func legacyBinary() (string, bool) {
+	path, err := exec.LookPath(legacyName)
+	if err != nil {
+		return "", false
+	}
+
+	if info, err := buildinfo.ReadFile(path); err == nil && info.Main.Path == legacyModulePath {
+		return path, true
+	}
+
+	target, err := filepath.EvalSymlinks(path)
+	if err == nil && strings.Contains(filepath.ToSlash(target), "/@segersniels/rexdiff/") {
+		return path, true
+	}
+	return "", false
 }
 
 // Refresh rewrites the installed Rex module and agent skills that differ from
@@ -269,7 +402,7 @@ func uninstallRex(out io.Writer) error {
 		return err
 	}
 
-	updated, removed := removeSetupCall(string(current))
+	updated, removed := removeSetupCall(string(current), rexMarker)
 	if removed {
 		if err := os.WriteFile(initPath, []byte(updated), 0o644); err != nil {
 			return err
@@ -289,11 +422,11 @@ func uninstallRex(out io.Writer) error {
 	return nil
 }
 
-// removeSetupCall removes the lines that setup added to init.lua, and the
-// blank line that setup put above them. The lines end at the first line that
-// is "end", or "}" in the older format without pcall.
-func removeSetupCall(text string) (string, bool) {
-	start := strings.Index(text, rexMarker)
+// removeSetupCall removes the lines that start with marker, which setup added
+// to init.lua, and the blank line that setup put above them. The lines end at
+// the first line that is "end", or "}" in the older format without pcall.
+func removeSetupCall(text, marker string) (string, bool) {
+	start := strings.Index(text, marker)
 	if start < 0 {
 		return text, false
 	}
