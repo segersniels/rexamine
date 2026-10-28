@@ -41,7 +41,7 @@ const focusCooldown = 30 * time.Second
 const composerIndent = 2
 
 // mode tells whether keys go to the page, to the comment composer, to the
-// worktree picker, or to the file finder.
+// worktree picker, to the file finder, or to the base branch finder.
 type mode int
 
 const (
@@ -49,6 +49,7 @@ const (
 	composing
 	picking
 	finding
+	choosingBase
 )
 
 // destination tells where the composer sends a comment.
@@ -79,6 +80,10 @@ type (
 	worktreesMsg struct {
 		worktrees []source.Worktree
 		err       error
+	}
+	branchesMsg struct {
+		branches []string
+		err      error
 	}
 	checkoutMsg struct {
 		gen      int
@@ -115,6 +120,7 @@ type Model struct {
 	composeKeys composeKeys
 	pickKeys    pickKeys
 	findKeys    findKeys
+	baseKeys    findKeys
 	help        help.Model
 	spinner     spinner.Model
 	composer    textarea.Model
@@ -171,7 +177,10 @@ type Model struct {
 	worktrees []source.Worktree
 	pick      int
 
-	// finder holds the query of the file finder, and selectedMatch is the match under its cursor.
+	// branches holds the branches that the base branch finder searches.
+	branches []string
+
+	// finder holds the query of the file or base branch finder, and selectedMatch is the match under its cursor.
 	finder        textinput.Model
 	selectedMatch int
 
@@ -203,13 +212,14 @@ func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, m
 
 	finder := textinput.New()
 	finder.Prompt = "/ "
-	finder.Placeholder = "Type part of a path…"
 	finder.SetStyles(textinput.DefaultStyles(isDark))
 
 	helpView := help.New()
 	helpView.Styles = help.DefaultStyles(isDark)
 
 	keys := newBrowseKeys()
+	baseKeys := newFindKeys()
+	baseKeys.Jump.SetHelp("enter", "compare")
 
 	// The pull request of the current branch is what gh shows without a target.
 	var other source.Source
@@ -231,6 +241,7 @@ func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, m
 		composeKeys:   newComposeKeys(),
 		pickKeys:      newPickKeys(),
 		findKeys:      newFindKeys(),
+		baseKeys:      baseKeys,
 		help:          helpView,
 		spinner:       spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(accentStyle)),
 		composer:      composer,
@@ -252,6 +263,7 @@ func (m *Model) enableKeys() {
 	_, local := m.source.(source.Local)
 	m.keys.Toggle.SetEnabled(local)
 	m.keys.Worktree.SetEnabled(local)
+	m.keys.Base.SetEnabled(local)
 	m.keys.Open.SetEnabled(!local)
 	m.keys.Switch.SetEnabled(m.other != nil)
 	if local {
@@ -366,6 +378,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.worktrees, m.pick, m.mode = msg.worktrees, 0, picking
 		return m, nil
 
+	case branchesMsg:
+		if msg.err != nil {
+			return m, m.setStatus(errorStyle.Render(msg.err.Error()))
+		}
+		m.branches = msg.branches
+		return m, m.startFinder(choosingBase)
+
 	case checkoutMsg:
 		// A newer switch or load replaced this search.
 		if msg.gen != m.loadGen {
@@ -406,7 +425,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.mode {
 		case composing:
 			m.composer, cmd = m.composer.Update(msg)
-		case finding:
+		case finding, choosingBase:
 			m.finder, cmd = m.finder.Update(msg)
 			m.selectedMatch = 0
 		}
@@ -421,13 +440,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateComposer(msg)
 		case picking:
 			return m.updatePicker(msg)
-		case finding:
+		case finding, choosingBase:
 			return m.updateFinder(msg)
 		}
 		return m.updateBrowser(msg)
 
 	case tea.MouseMsg:
-		if m.mode == picking || m.mode == finding {
+		if m.mode == picking || m.mode == finding || m.mode == choosingBase {
 			return m, nil
 		}
 		return m, m.handleMouse(msg)
@@ -507,7 +526,7 @@ func (m Model) updateBrowser(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.PrevFile):
 		m.jumpToFile(-1)
 	case key.Matches(msg, m.keys.FindFile):
-		return m, m.startFinder()
+		return m, m.startFinder(finding)
 	case key.Matches(msg, m.keys.Collapse):
 		if m.cursor < len(m.rows) && m.rows[m.cursor].kind == descriptionRow {
 			m.toggleDescription()
@@ -542,6 +561,8 @@ func (m Model) updateBrowser(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.reload(), m.setStatus(dimStyle.Render("Showing "+local.Scope.String()+"…")))
 	case key.Matches(msg, m.keys.Worktree):
 		return m, listWorktrees(m.source.(source.Local).Dir)
+	case key.Matches(msg, m.keys.Base):
+		return m, listBranches(m.source.(source.Local).Dir)
 	case key.Matches(msg, m.keys.Switch):
 		return m.switchSource()
 	case key.Matches(msg, m.keys.Reload):
@@ -574,22 +595,28 @@ func (m Model) updatePicker(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// startFinder opens the file finder with an empty query.
-func (m *Model) startFinder() tea.Cmd {
-	if len(m.files) == 0 {
+// startFinder opens the file finder or the base branch finder, as mode
+// tells, with an empty query.
+func (m *Model) startFinder(mode mode) tea.Cmd {
+	m.finder.Placeholder = "Type part of a path…"
+	if mode == choosingBase {
+		m.finder.Placeholder = "Type part of a branch…"
+	}
+	if len(m.finderItems(mode)) == 0 {
 		return nil
 	}
 
-	m.mode = finding
+	m.mode = mode
 	m.selectedMatch = 0
 	m.finder.Reset()
 	return m.finder.Focus()
 }
 
-// updateFinder handles keys while the user finds a file. Other keys edit the
-// query, and a new query moves the cursor back to the first match.
+// updateFinder handles keys while the user finds a file or a base branch.
+// Other keys edit the query, and a new query moves the cursor back to the
+// first match.
 func (m Model) updateFinder(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	matches := m.matchingFiles()
+	matches := m.finderMatches()
 
 	switch {
 	case key.Matches(msg, m.findKeys.Up):
@@ -606,12 +633,15 @@ func (m Model) updateFinder(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if len(matches) == 0 {
 			return m, nil
 		}
+		chosen := matches[min(m.selectedMatch, len(matches)-1)]
+		if m.mode == choosingBase {
+			return m.compareWithBase(m.branches[chosen])
+		}
 		m.mode = browsing
 		m.finder.Blur()
 
 		// A reload can remove files while the finder is open, so the cursor can be past the last match.
-		file := matches[min(m.selectedMatch, len(matches)-1)]
-		title := m.fileStarts[file]
+		title := m.fileStarts[chosen]
 		m.cursor, m.offset = title, title
 		m.clamp()
 		return m, nil
@@ -626,17 +656,42 @@ func (m Model) updateFinder(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// matchingFiles lists the indexes of the shown files whose path contains the
-// query, in page order. Case does not matter.
-func (m Model) matchingFiles() []int {
+// finderItems lists what the finder in mode searches: the paths of the shown
+// files in page order, or the branches.
+func (m Model) finderItems(mode mode) []string {
+	if mode == choosingBase {
+		return m.branches
+	}
+	paths := make([]string, len(m.files))
+	for i, file := range m.files {
+		paths[i] = file.Path
+	}
+	return paths
+}
+
+// finderMatches lists the indexes of the finder items that contain the
+// query. Case does not matter.
+func (m Model) finderMatches() []int {
 	query := strings.ToLower(m.finder.Value())
 	var matches []int
-	for i, file := range m.files {
-		if strings.Contains(strings.ToLower(file.Path), query) {
+	for i, item := range m.finderItems(m.mode) {
+		if strings.Contains(strings.ToLower(item), query) {
 			matches = append(matches, i)
 		}
 	}
 	return matches
+}
+
+// compareWithBase shows the branch changes compared to the chosen branch,
+// such as the parent of a stacked branch.
+func (m Model) compareWithBase(branch string) (tea.Model, tea.Cmd) {
+	m.mode = browsing
+	m.finder.Blur()
+
+	local := m.source.(source.Local)
+	local.Base, local.Scope = branch, source.Branch
+	m.source = local
+	return m, tea.Batch(m.reload(), m.setStatus(dimStyle.Render("Comparing with "+branch+"…")))
 }
 
 // switchWorktree shows the local changes of another checkout. The turn
@@ -1199,7 +1254,7 @@ func (m Model) screen() string {
 		return ""
 	case m.mode == picking:
 		return m.pickerView()
-	case m.mode == finding:
+	case m.mode == finding || m.mode == choosingBase:
 		return m.finderView()
 	case m.review == nil && m.loadErr != nil:
 		return ansi.Wrap(errorStyle.Render(m.loadErr.Error()), m.width, "") + "\n\n" + dimStyle.Render("r retry · q quit")
@@ -1252,9 +1307,13 @@ func (m Model) pickerView() string {
 	return strings.Join([]string{bar, strings.Join(lines, "\n"), m.footerView()}, "\n")
 }
 
-// finderView shows the query and the files that match it.
+// finderView shows the query and the files or branches that match it.
 func (m Model) finderView() string {
-	title := ansi.Truncate(" Find file", m.width, "…")
+	title, empty := " Find file", "No matching files."
+	if m.mode == choosingBase {
+		title, empty = " Compare with branch", "No matching branches."
+	}
+	title = ansi.Truncate(title, m.width, "…")
 	bar := barStyle.Render(title + strings.Repeat(" ", max(0, m.width-ansi.StringWidth(title))))
 
 	finder := m.finder
@@ -1262,13 +1321,14 @@ func (m Model) finderView() string {
 	input := " " + finder.View()
 
 	// The list scrolls only as far as it must to keep the cursor on the screen.
-	matches := m.matchingFiles()
+	items := m.finderItems(m.mode)
+	matches := m.finderMatches()
 	height := max(1, m.bodyHeight()-1)
 	start := max(0, m.selectedMatch-height+1)
 
 	lines := make([]string, height)
 	if len(matches) == 0 {
-		lines[0] = "  " + dimStyle.Render("No matching files.")
+		lines[0] = "  " + dimStyle.Render(empty)
 	}
 	for y := range lines {
 		i := start + y
@@ -1280,8 +1340,8 @@ func (m Model) finderView() string {
 		if i == m.selectedMatch {
 			marker = accentStyle.Render("▌")
 		}
-		path := ansi.Truncate(m.files[matches[i]].Path, max(1, m.contentWidth()-2), "…")
-		lines[y] = marker + " " + path
+		item := ansi.Truncate(items[matches[i]], max(1, m.contentWidth()-2), "…")
+		lines[y] = marker + " " + item
 	}
 
 	return strings.Join([]string{bar, input, strings.Join(lines, "\n"), m.footerView()}, "\n")
@@ -1445,6 +1505,8 @@ func (m Model) footerView() string {
 		footer = m.help.View(m.pickKeys)
 	case m.mode == finding:
 		footer = m.help.View(m.findKeys)
+	case m.mode == choosingBase:
+		footer = m.help.View(m.baseKeys)
 	}
 
 	// Help cuts its own line short, but not on every width, so cut each line here too.
@@ -1494,6 +1556,14 @@ func listWorktrees(dir string) tea.Cmd {
 	return func() tea.Msg {
 		worktrees, err := source.Worktrees(dir)
 		return worktreesMsg{worktrees, err}
+	}
+}
+
+// listBranches lists the branches of the repository in dir in the background.
+func listBranches(dir string) tea.Cmd {
+	return func() tea.Msg {
+		branches, err := source.Branches(dir)
+		return branchesMsg{branches, err}
 	}
 }
 

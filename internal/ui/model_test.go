@@ -798,3 +798,25 @@ func TestFindFileJumpsToTheChosenFile(t *testing.T) {
 		t.Errorf("got mode %d and cursor %d after esc, want the page at %d", m.mode, m.cursor, m.fileStarts[2])
 	}
 }
+
+func TestBaseFinderComparesWithTheChosenBranch(t *testing.T) {
+	var model tea.Model = New(source.Local{Scope: source.Uncommitted}, &fakeSender{}, nil, "dark", config.Config{})
+	model, _ = model.Update(tea.WindowSizeMsg{Width: 40, Height: 20})
+	model, _ = model.Update(branchesMsg{branches: []string{"feat/child", "feat/parent", "origin/feat/parent", "origin/main"}})
+
+	m, _ := press(model.(Model), "p", "a", "r")
+	if m.mode != choosingBase {
+		t.Fatal("base finder did not open")
+	}
+	view := ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "origin/feat/parent") || strings.Contains(view, "origin/main") {
+		t.Errorf("base finder does not show only the matching branches:\n%s", view)
+	}
+
+	// Choosing a base shows the branch changes, because only they compare with the base.
+	m, cmd := press(m, "down", "enter")
+	local := m.source.(source.Local)
+	if m.mode != browsing || local.Base != "origin/feat/parent" || local.Scope != source.Branch || cmd == nil {
+		t.Errorf("got mode %d, base %q, and scope %v, want the branch changes compared to origin/feat/parent to load", m.mode, local.Base, local.Scope)
+	}
+}

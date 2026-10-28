@@ -8,7 +8,7 @@ type browseKeys struct {
 	Top, Bottom, NextFile, PrevFile, Collapse    key.Binding
 	FindFile, HideTests                          key.Binding
 	Select, Comment, Clear                       key.Binding
-	Toggle, Worktree, Switch, Open, Reload       key.Binding
+	Toggle, Worktree, Base, Switch, Open, Reload key.Binding
 	Help, Quit                                   key.Binding
 }
 
@@ -31,6 +31,7 @@ func newBrowseKeys() browseKeys {
 		Clear:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear selection")),
 		Toggle:   key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "scope")),
 		Worktree: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "worktree")),
+		Base:     key.NewBinding(key.WithKeys("B"), key.WithHelp("B", "base branch")),
 		Switch:   key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "pull request/local")),
 		Open:     key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open on GitHub")),
 		Reload:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "reload")),
@@ -52,7 +53,7 @@ func (k browseKeys) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.HalfUp, k.HalfDown, k.PageUp, k.PageDown},
 		{k.Top, k.Bottom, k.NextFile, k.PrevFile, k.FindFile, k.Collapse, k.HideTests},
 		{k.Select, k.Comment, k.Clear},
-		{k.Toggle, k.Worktree, k.Switch, k.Open, k.Reload, k.Help, k.Quit},
+		{k.Toggle, k.Worktree, k.Base, k.Switch, k.Open, k.Reload, k.Help, k.Quit},
 	}
 }
 
@@ -108,8 +109,8 @@ func (k pickKeys) FullHelp() [][]key.Binding {
 	return [][]key.Binding{k.ShortHelp()}
 }
 
-// findKeys holds the keys for finding a file. Letters go to the query, so the
-// keys to move are arrows and control keys.
+// findKeys holds the keys for finding a file or a base branch. Letters go to
+// the query, so the keys to move are arrows and control keys.
 type findKeys struct {
 	Up, Down, Jump, Cancel key.Binding
 }

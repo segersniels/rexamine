@@ -291,6 +291,27 @@ func defaultBranch(root string) (string, error) {
 	return "", errors.New("cannot find the default branch; set it with: git remote set-head origin --auto")
 }
 
+// Branches lists the local and remote branches of the repository in dir, or
+// in the working directory when dir is empty, with the latest commit first.
+func Branches(dir string) ([]string, error) {
+	out, err := git(dir, "for-each-ref", "--sort=-committerdate", "--format=%(refname:short)%00%(symref)", "refs/heads", "refs/remotes")
+	if err != nil {
+		return nil, err
+	}
+
+	var branches []string
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		name, symref, _ := strings.Cut(line, "\x00")
+
+		// A remote HEAD only points to the remote's default branch, which the list already has.
+		if name == "" || symref != "" {
+			continue
+		}
+		branches = append(branches, name)
+	}
+	return branches, nil
+}
+
 // binaryCheckSize is how much of a file git reads to decide that it is binary.
 const binaryCheckSize = 8000
 

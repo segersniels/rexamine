@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -101,6 +102,20 @@ func TestLocalBranchComparesWithTheBase(t *testing.T) {
 	}
 	if review.Base != "feature" {
 		t.Errorf("base = %q, want feature", review.Base)
+	}
+}
+
+func TestBranchesListsTheLocalBranches(t *testing.T) {
+	dir := newRepo(t)
+
+	branches, err := Branches(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Both branches have commits at about the same time, so only the set is certain.
+	if len(branches) != 2 || !slices.Contains(branches, "main") || !slices.Contains(branches, "feature") {
+		t.Errorf("branches = %q, want main and feature", branches)
 	}
 }
 

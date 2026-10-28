@@ -37,6 +37,7 @@ Press `p` to switch between the local changes and the pull request of the branch
 | Click a line number      | Comment on that line                                      |
 | `t`                      | Switch between branch, uncommitted, and last-turn changes |
 | `w`                      | Show the changes of another worktree, by its branch       |
+| `B`                      | Compare the branch changes with another branch            |
 | `p`                      | Switch between the local changes and the pull request     |
 | `r`                      | Reload                                                    |
 | `o`                      | Open the pull request on GitHub                           |
