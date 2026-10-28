@@ -35,6 +35,7 @@ Press `p` to switch between the local changes and the pull request of the branch
 | `shift+tab`, in the box  | Switch the comment between the agent and GitHub           |
 | Mouse drag over lines    | Select the lines and comment on them                      |
 | Click a line number      | Comment on that line                                      |
+| `e`                      | Open the file at the line in `$VISUAL` or `$EDITOR`       |
 | `t`                      | Switch between branch, uncommitted, and last-turn changes |
 | `w`                      | Show the changes of another worktree, by its branch       |
 | `B`                      | Compare the branch changes with another branch            |

@@ -7,7 +7,7 @@ type browseKeys struct {
 	Up, Down, HalfUp, HalfDown, PageUp, PageDown key.Binding
 	Top, Bottom, NextFile, PrevFile, Collapse    key.Binding
 	FindFile, HideTests                          key.Binding
-	Select, Comment, Clear                       key.Binding
+	Select, Comment, Edit, Clear                 key.Binding
 	Toggle, Worktree, Base, Switch, Open, Reload key.Binding
 	Help, Quit                                   key.Binding
 }
@@ -28,6 +28,7 @@ func newBrowseKeys() browseKeys {
 		Collapse: key.NewBinding(key.WithKeys("z"), key.WithHelp("z", "collapse/expand")),
 		Select:   key.NewBinding(key.WithKeys("v", "V"), key.WithHelp("v", "select")),
 		Comment:  key.NewBinding(key.WithKeys("c", "enter"), key.WithHelp("c", "comment")),
+		Edit:     key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "open in editor")),
 		Clear:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "clear selection")),
 		Toggle:   key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "scope")),
 		Worktree: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "worktree")),
@@ -52,7 +53,7 @@ func (k browseKeys) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.HalfUp, k.HalfDown, k.PageUp, k.PageDown},
 		{k.Top, k.Bottom, k.NextFile, k.PrevFile, k.FindFile, k.Collapse, k.HideTests},
-		{k.Select, k.Comment, k.Clear},
+		{k.Select, k.Comment, k.Edit, k.Clear},
 		{k.Toggle, k.Worktree, k.Base, k.Switch, k.Open, k.Reload, k.Help, k.Quit},
 	}
 }

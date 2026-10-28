@@ -4,7 +4,11 @@
 package ui
 
 import (
+	"cmp"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -22,6 +26,7 @@ import (
 	"github.com/segersniels/rexamine/internal/agent"
 	"github.com/segersniels/rexamine/internal/config"
 	"github.com/segersniels/rexamine/internal/diff"
+	"github.com/segersniels/rexamine/internal/editor"
 	"github.com/segersniels/rexamine/internal/github"
 	"github.com/segersniels/rexamine/internal/source"
 	"github.com/segersniels/rexamine/internal/update"
@@ -36,6 +41,10 @@ const statusDuration = 3 * time.Second
 // focusCooldown is the shortest time between two loads that a pull request
 // starts when its pane gets focus.
 const focusCooldown = 30 * time.Second
+
+// editorStartup is how long rexamine waits for an editor launcher to fail
+// before it takes the editor as open.
+const editorStartup = time.Second
 
 // composerIndent is how far the comment box is indented under the code.
 const composerIndent = 2
@@ -190,6 +199,9 @@ type Model struct {
 	// newRelease tells about a newer release of rexamine, or is nil.
 	newRelease *update.Notice
 
+	// editor opens files at a line, or is nil until main finds the user's editor.
+	editor *editor.Editor
+
 	theme terminalTheme
 }
 
@@ -218,6 +230,7 @@ func New(src source.Source, sender agent.Sender, turns <-chan agent.TurnEvent, m
 	helpView.Styles = help.DefaultStyles(isDark)
 
 	keys := newBrowseKeys()
+	keys.Edit.SetEnabled(false)
 	baseKeys := newFindKeys()
 	baseKeys.Jump.SetHelp("enter", "compare")
 
@@ -364,6 +377,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m, m.setStatus(errorStyle.Render(msg.err.Error()))
 		}
+		return m, nil
+
+	// main sends the editor when its search at startup finds one, and only then does the editor key work.
+	case editor.Editor:
+		m.editor = &msg
+		m.keys.Edit.SetEnabled(true)
 		return m, nil
 
 	case worktreesMsg:
@@ -549,6 +568,8 @@ func (m Model) updateBrowser(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.anchor = -1
 	case key.Matches(msg, m.keys.Comment):
 		return m, m.startComment()
+	case key.Matches(msg, m.keys.Edit):
+		return m, m.openEditor()
 	case key.Matches(msg, m.keys.Toggle):
 		local := m.source.(source.Local)
 		local.Scope = local.Scope.Next()
@@ -1146,6 +1167,57 @@ func (m *Model) startComment() tea.Cmd {
 	return m.composer.Focus()
 }
 
+// openEditor opens the file under the cursor in the user's editor, at the
+// cursor's line or at the first selected line.
+func (m *Model) openEditor() tea.Cmd {
+	i := m.cursor
+	if first, last, ok := m.selection(); ok {
+		// The selection covers only the file where it started, which can be below the first selected row.
+		i = first
+		for i < last && !m.isSelected(i) {
+			i++
+		}
+	}
+	if i >= len(m.rows) || m.rows[i].file < 0 {
+		return m.setStatus(dimStyle.Render("Move to a file to open it in your editor."))
+	}
+
+	// The files of a pull request are on disk only where its branch is checked out.
+	if m.review.Root == "" {
+		return m.setStatus(dimStyle.Render("Check out the branch of the pull request to open its files."))
+	}
+
+	r := m.rows[i]
+	file := m.files[r.file]
+	if file.IsDeleted {
+		return m.setStatus(dimStyle.Render("This file was deleted, so there is nothing to open."))
+	}
+
+	return startEditor(*m.editor, m.review.Root, file.Path, editorLine(file, r))
+}
+
+// editorLine finds the line of the new file that row r shows. A removed line
+// is not in the new file, so it opens at the next line that is, or at the
+// line before it at the end of a hunk. A file title opens at the start.
+func editorLine(file diff.File, r row) int {
+	if r.hunk < 0 {
+		return 1
+	}
+
+	lines := file.Hunks[r.hunk].Lines
+	for _, line := range lines[r.line:] {
+		if line.NewLine > 0 {
+			return line.NewLine
+		}
+	}
+	for i := r.line - 1; i >= 0; i-- {
+		if lines[i].NewLine > 0 {
+			return lines[i].NewLine
+		}
+	}
+	return 1
+}
+
 // setDestination chooses where the composer sends comments, and updates the
 // hints that tell the user.
 func (m *Model) setDestination(d destination) {
@@ -1624,6 +1696,56 @@ func commentLine(line diff.Line) github.CommentLine {
 // openInBrowser opens a pull request on GitHub in the background.
 func openInBrowser(url string) tea.Cmd {
 	return func() tea.Msg { return openedMsg{github.OpenInBrowser(url)} }
+}
+
+// startEditor opens the file at path under root at line. An editor with its
+// own window starts beside rexamine. A terminal editor opens in a new Rex tab,
+// so the review stays open. Outside Rex, it takes over the terminal until it quits.
+func startEditor(ed editor.Editor, root, path string, line int) tea.Cmd {
+	args := ed.Args(filepath.Join(root, path), line)
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Dir = root
+
+	if !ed.InTerminal() {
+		return func() tea.Msg {
+			var stderr strings.Builder
+			cmd.Stderr = &stderr
+			if err := cmd.Start(); err != nil {
+				return openedMsg{fmt.Errorf("open the editor: %w", err)}
+			}
+
+			exited := make(chan error, 1)
+			go func() { exited <- cmd.Wait() }()
+
+			// A launcher such as `code` hands the file to the app and exits, so a failure shows quickly. An
+			// editor that keeps running, such as `code --wait`, is open.
+			select {
+			case err := <-exited:
+				if err != nil {
+					return openedMsg{fmt.Errorf("open the editor: %s", cmp.Or(strings.TrimSpace(stderr.String()), err.Error()))}
+				}
+			case <-time.After(editorStartup):
+			}
+			return openedMsg{}
+		}
+	}
+
+	if session := os.Getenv("REX_SESSION"); session != "" {
+		return func() tea.Msg {
+			rexArgs := append([]string{"run", "-s", session, "-c", root, "--"}, args...)
+			if out, err := exec.Command("rex", rexArgs...).CombinedOutput(); err != nil {
+				return openedMsg{fmt.Errorf("rex: %s", strings.TrimSpace(string(out)))}
+			}
+			return openedMsg{}
+		}
+	}
+
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		if err != nil {
+			err = fmt.Errorf("open the editor: %w", err)
+		}
+		return openedMsg{err}
+	})
 }
 
 // clamp limits n to the range from low to high.

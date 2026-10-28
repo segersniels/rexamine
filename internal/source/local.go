@@ -143,6 +143,7 @@ func (l Local) Load() (Review, error) {
 		Base:    baseName,
 		Head:    headName,
 		Diff:    tracked + untracked,
+		Root:    root,
 	}, nil
 }
 
@@ -154,6 +155,7 @@ func (l Local) loadLastTurn(root, branch string) (Review, error) {
 		Title:   "Last agent turn on " + branch,
 		Base:    "turn start",
 		Head:    "working tree · " + l.turnProgress(),
+		Root:    root,
 	}
 
 	waiting := review

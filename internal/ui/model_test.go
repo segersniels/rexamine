@@ -11,6 +11,7 @@ import (
 	"github.com/segersniels/rexamine/internal/agent"
 	"github.com/segersniels/rexamine/internal/config"
 	"github.com/segersniels/rexamine/internal/diff"
+	"github.com/segersniels/rexamine/internal/editor"
 	"github.com/segersniels/rexamine/internal/github"
 	"github.com/segersniels/rexamine/internal/source"
 	"github.com/segersniels/rexamine/internal/update"
@@ -818,5 +819,41 @@ func TestBaseFinderComparesWithTheChosenBranch(t *testing.T) {
 	local := m.source.(source.Local)
 	if m.mode != browsing || local.Base != "origin/feat/parent" || local.Scope != source.Branch || cmd == nil {
 		t.Errorf("got mode %d, base %q, and scope %v, want the branch changes compared to origin/feat/parent to load", m.mode, local.Base, local.Scope)
+	}
+}
+
+func TestEditorLineOpensARemovedLineAtTheNextLine(t *testing.T) {
+	file := diff.Parse(testDiff)[0]
+
+	// Line 2 of the hunk is the removed META_TEXT_MAX_LENGTH, and matchLanguage takes its place at line 3.
+	if got := editorLine(file, row{hunk: 0, line: 2}); got != 3 {
+		t.Errorf("got line %d, want 3", got)
+	}
+}
+
+func TestEditorKeyIsOffUntilAnEditorIsFound(t *testing.T) {
+	m := newLoadedModel(t, &fakeSender{}, 60, 40)
+	m.cursor = m.fileStarts[0]
+
+	m, _ = press(m, "e")
+	if m.status != "" || m.keys.Edit.Enabled() {
+		t.Errorf("got status %q; want the editor key off", m.status)
+	}
+}
+
+func TestEditorKeyNeedsTheBranchOfThePullRequest(t *testing.T) {
+	m := newLoadedModel(t, &fakeSender{}, 60, 40)
+	m.cursor = m.fileStarts[0]
+
+	var model tea.Model = m
+	model, _ = model.Update(editor.Editor{})
+	m = model.(Model)
+	if !m.keys.Edit.Enabled() {
+		t.Error("the editor key is off after an editor was found")
+	}
+
+	m, _ = press(m, "e")
+	if !strings.Contains(m.status, "Check out the branch") {
+		t.Errorf("got status %q, want a hint to check out the branch", m.status)
 	}
 }

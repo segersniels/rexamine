@@ -50,6 +50,7 @@ Without an agent pane, rexamine copies each comment on local changes to the clip
 - **Local changes and pull requests**: review your branch, only the uncommitted changes, or a GitHub pull request with its description, review status, and labels. Press `p` to switch between the pull request and your local changes.
 - **Comments into the prompt**: select lines with `v` or the mouse, and send a comment with the lines to the agent pane as a real paste. The agent waits for you to submit, or press `ctrl+s` to submit the comment at once.
 - **Comments on GitHub**: in a pull request, post a comment on the selected lines. Beside an agent, press `shift+tab` in the comment box to switch between the agent and GitHub.
+- **Open in your editor**: press `e` to open the file at the current line in `$VISUAL` or `$EDITOR`, such as Neovim, VS Code, or Cursor. In Rex, a terminal editor opens in a new tab, so the review stays open. The key shows only when rexamine finds your editor.
 - **Live updates**: the view follows your edits, including untracked files.
 - **Last agent turn**: inside Rex, press `t` to see only what the agent changed since it started its last turn.
 - **Made for narrow panes**: text wraps to the pane's width and reflows when you resize it.

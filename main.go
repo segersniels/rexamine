@@ -17,6 +17,7 @@ import (
 
 	"github.com/segersniels/rexamine/internal/agent"
 	"github.com/segersniels/rexamine/internal/config"
+	"github.com/segersniels/rexamine/internal/editor"
 	"github.com/segersniels/rexamine/internal/setup"
 	"github.com/segersniels/rexamine/internal/source"
 	"github.com/segersniels/rexamine/internal/ui"
@@ -138,6 +139,13 @@ func run() int {
 	go func() {
 		if notice, ok := update.Check(version); ok {
 			program.Send(notice)
+		}
+	}()
+
+	// The search can start the user's shell, so it runs beside the screen too. Without an editor, the key stays off.
+	go func() {
+		if ed, err := editor.Find(); err == nil {
+			program.Send(ed)
 		}
 	}()
 	if _, err := program.Run(); err != nil {

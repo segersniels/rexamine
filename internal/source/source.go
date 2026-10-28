@@ -22,6 +22,10 @@ type Review struct {
 
 	Diff string
 
+	// Root is the directory that holds the reviewed files, so an editor can
+	// open them. It is empty when no worktree has a pull request's branch.
+	Root string
+
 	// PullRequest is set when the review is a pull request.
 	PullRequest *github.PullRequest
 }
@@ -47,12 +51,24 @@ func (p PullRequest) Load() (Review, error) {
 	if err != nil {
 		return Review{}, err
 	}
+
+	// A failed search only means that the files cannot open in an editor, so the pull request still shows.
+	var root string
+	worktrees, _ := Worktrees(p.Dir)
+	for _, w := range worktrees {
+		if w.Branch == pr.HeadRefName {
+			root = w.Path
+			break
+		}
+	}
+
 	return Review{
 		Context:     fmt.Sprintf("%s #%d", github.Repository(pr.URL), pr.Number),
 		Title:       pr.Title,
 		Base:        pr.BaseRefName,
 		Head:        pr.HeadRefName,
 		Diff:        diff,
+		Root:        root,
 		PullRequest: &pr,
 	}, nil
 }
