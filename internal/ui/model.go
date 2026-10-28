@@ -148,6 +148,9 @@ type Model struct {
 	// load, because a new layout on each resize must stay fast.
 	highlights []highlightedFile
 
+	// highlightCache holds the colors of the shown hunks, so a reload highlights only the hunks that changed.
+	highlightCache hunkColors
+
 	loading  bool
 	loadGen  int
 	watchGen int
@@ -513,7 +516,7 @@ func (m *Model) showFiles() {
 	if m.settings.HideTests {
 		files = slices.DeleteFunc(slices.Clone(files), diff.File.IsTest)
 	}
-	m.highlights = highlightFiles(files, m.markdownStyle)
+	m.highlights, m.highlightCache = highlightFiles(files, m.markdownStyle, m.highlightCache)
 	m.layout(files)
 }
 

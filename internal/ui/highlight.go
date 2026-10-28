@@ -22,17 +22,43 @@ type span struct {
 // highlightedFile holds the syntax colors of a file's lines, by hunk and line.
 type highlightedFile [][][]span
 
+// hunkColors holds the syntax colors of hunks' lines, by hunkKey.
+type hunkColors map[string][][]span
+
 // highlightFiles colors the lines of files for the language that each file
-// name implies. markdownStyle picks light or dark colors.
-func highlightFiles(files []diff.File, markdownStyle string) []highlightedFile {
+// name implies. markdownStyle picks light or dark colors. It reuses the colors
+// in previous for the hunks that did not change, because a parse is slow and
+// a reload while the agent works changes few hunks. It also returns the
+// colors of only these files' hunks, for the next call.
+func highlightFiles(files []diff.File, markdownStyle string, previous hunkColors) ([]highlightedFile, hunkColors) {
 	result := make([]highlightedFile, len(files))
+	current := hunkColors{}
 	for i, file := range files {
 		colorSource := fileColorer(file.Path, markdownStyle)
 		for _, hunk := range file.Hunks {
-			result[i] = append(result[i], highlightHunk(colorSource, hunk))
+			key := hunkKey(file.Path, hunk)
+			lines, ok := previous[key]
+			if !ok {
+				lines = highlightHunk(colorSource, hunk)
+			}
+			current[key] = lines
+			result[i] = append(result[i], lines)
 		}
 	}
-	return result
+	return result, current
+}
+
+// hunkKey identifies a hunk by everything that its colors depend on: the
+// file path, which picks the language, and the kind and text of each line.
+func hunkKey(path string, hunk diff.Hunk) string {
+	var b strings.Builder
+	b.WriteString(path)
+	for _, line := range hunk.Lines {
+		b.WriteByte(0)
+		b.WriteString(line.Kind.Sign())
+		b.WriteString(line.Text)
+	}
+	return b.String()
 }
 
 // sourceColorer colors the lines of a source text that ends with a newline,

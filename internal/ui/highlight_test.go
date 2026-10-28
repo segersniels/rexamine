@@ -2,6 +2,7 @@ package ui
 
 import (
 	"os"
+	"reflect"
 	"regexp"
 	"testing"
 
@@ -28,6 +29,27 @@ func TestHighlightHunkKeepsCommentStateAcrossLines(t *testing.T) {
 	}
 	if lines[3][0].color == commentColor {
 		t.Error("code after the comment has the comment color")
+	}
+}
+
+func TestHighlightFilesReusesTheColorsOfUnchangedHunks(t *testing.T) {
+	files := []diff.File{{Path: "main.go", Hunks: []diff.Hunk{
+		{Lines: []diff.Line{{Kind: diff.Added, Text: "x := 1"}}},
+		{Lines: []diff.Line{{Kind: diff.Added, Text: "y := 2"}}},
+	}}}
+	first, colors := highlightFiles(files, "dark", nil)
+
+	files[0].Hunks[1] = diff.Hunk{Lines: []diff.Line{{Kind: diff.Added, Text: "// y := 2"}}}
+	second, colors := highlightFiles(files, "dark", colors)
+
+	if &second[0][0][0][0] != &first[0][0][0][0] {
+		t.Error("the unchanged hunk was highlighted again")
+	}
+	if want := highlightHunk(fileColorer("main.go", "dark"), files[0].Hunks[1]); !reflect.DeepEqual(second[0][1], want) {
+		t.Errorf("the changed hunk has colors %+v, want %+v", second[0][1], want)
+	}
+	if len(colors) != 2 {
+		t.Errorf("the cache holds %d hunks, want only the 2 current hunks", len(colors))
 	}
 }
 
