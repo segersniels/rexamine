@@ -28,6 +28,28 @@ type Review struct {
 
 	// PullRequest is set when the review is a pull request.
 	PullRequest *github.PullRequest
+
+	// Files reads the full files that the diff compares, or is nil when there is no diff.
+	Files FileReader
+}
+
+// FileReader reads the full text of the files in a review, so each hunk can
+// get the syntax colors of its whole file.
+type FileReader interface {
+	// ReadFiles returns the text of oldPaths in the old version and of
+	// newPaths in the new version, by path. It leaves out a file that it
+	// cannot read, such as a file that a later change removed.
+	ReadFiles(oldPaths, newPaths []string) (oldTexts, newTexts map[string]string)
+}
+
+// pullRequestFiles reads the files of a pull request through the GitHub API.
+type pullRequestFiles struct {
+	pr github.PullRequest
+}
+
+// ReadFiles reads the files where the pull request split from its base branch and at its head.
+func (p pullRequestFiles) ReadFiles(oldPaths, newPaths []string) (map[string]string, map[string]string) {
+	return github.ReadFiles(p.pr, oldPaths, newPaths)
 }
 
 // Source loads a review. rexamine calls Load again to reload it.
@@ -70,5 +92,6 @@ func (p PullRequest) Load() (Review, error) {
 		Diff:        diff,
 		Root:        root,
 		PullRequest: &pr,
+		Files:       pullRequestFiles{pr},
 	}, nil
 }

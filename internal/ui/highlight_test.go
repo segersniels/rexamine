@@ -17,7 +17,7 @@ func TestHighlightHunkKeepsCommentStateAcrossLines(t *testing.T) {
 		{Kind: diff.Added, Text: "x := 1"},
 	}}
 
-	lines := highlightHunk(fileColorer("main.go", "dark"), hunk)
+	lines := highlightHunk(fileColorer("main.go", "dark", uiHighlighters), hunk)
 	commentColor := lines[0][0].color
 	if commentColor == "" {
 		t.Fatal("comment line has no color")
@@ -37,15 +37,15 @@ func TestHighlightFilesReusesTheColorsOfUnchangedHunks(t *testing.T) {
 		{Lines: []diff.Line{{Kind: diff.Added, Text: "x := 1"}}},
 		{Lines: []diff.Line{{Kind: diff.Added, Text: "y := 2"}}},
 	}}}
-	first, colors := highlightFiles(files, "dark", nil)
+	first, colors := highlightFiles(files, "dark", nil, nil)
 
 	files[0].Hunks[1] = diff.Hunk{Lines: []diff.Line{{Kind: diff.Added, Text: "// y := 2"}}}
-	second, colors := highlightFiles(files, "dark", colors)
+	second, colors := highlightFiles(files, "dark", colors, nil)
 
 	if &second[0][0][0][0] != &first[0][0][0][0] {
 		t.Error("the unchanged hunk was highlighted again")
 	}
-	if want := highlightHunk(fileColorer("main.go", "dark"), files[0].Hunks[1]); !reflect.DeepEqual(second[0][1], want) {
+	if want := highlightHunk(fileColorer("main.go", "dark", uiHighlighters), files[0].Hunks[1]); !reflect.DeepEqual(second[0][1], want) {
 		t.Errorf("the changed hunk has colors %+v, want %+v", second[0][1], want)
 	}
 	if len(colors) != 2 {
@@ -54,7 +54,7 @@ func TestHighlightFilesReusesTheColorsOfUnchangedHunks(t *testing.T) {
 }
 
 func TestHighlightLinesLeavesUnknownFilesPlain(t *testing.T) {
-	lines := highlightLines(fileColorer("notes.unknownext", "dark"), []string{"\tsome text"})
+	lines := highlightLines(fileColorer("notes.unknownext", "dark", uiHighlighters), []string{"\tsome text"})
 	if len(lines[0]) != 1 || lines[0][0] != (span{text: "    some text"}) {
 		t.Errorf("got %+v, want one plain span with expanded tabs", lines[0])
 	}
@@ -64,7 +64,7 @@ func TestHighlightLinesShowsControlCharactersAsSymbols(t *testing.T) {
 	lines := []string{"s := \"x\ry\"", "b := 2\r", "c := \"\x1b[31m\""}
 	want := []string{"s := \"x␍y\"", "b := 2", "c := \"␛[31m\""}
 
-	got := highlightLines(fileColorer("main.go", "dark"), lines)
+	got := highlightLines(fileColorer("main.go", "dark", uiHighlighters), lines)
 	for i, spans := range got {
 		text := ""
 		for _, s := range spans {
@@ -89,7 +89,7 @@ func TestSpansInCutsAcrossSpans(t *testing.T) {
 func TestHighlightLinesColorsFunctionNames(t *testing.T) {
 	lines := []string{"export async function getAccountAccess(id: string) {", "  await db.batch(id);", "}"}
 
-	got := highlightLines(fileColorer("access.ts", "dark"), lines)
+	got := highlightLines(fileColorer("access.ts", "dark", uiHighlighters), lines)
 	for _, name := range []string{"getAccountAccess", "batch"} {
 		if color := spanColor(got, name); color != darkPalette.function {
 			t.Errorf("%s has color %q, want the function color %q", name, color, darkPalette.function)
@@ -99,7 +99,7 @@ func TestHighlightLinesColorsFunctionNames(t *testing.T) {
 
 func TestHighlightLinesColorsJSXTags(t *testing.T) {
 	for _, path := range []string{"inbox.tsx", "inbox.jsx"} {
-		got := highlightLines(fileColorer(path, "dark"), []string{`return <div className="list">{name}</div>;`})
+		got := highlightLines(fileColorer(path, "dark", uiHighlighters), []string{`return <div className="list">{name}</div>;`})
 		if color := spanColor(got, "div"); color != darkPalette.tag {
 			t.Errorf("%s: div has color %q, want the tag color %q", path, color, darkPalette.tag)
 		}
@@ -110,7 +110,7 @@ func TestHighlightLinesColorsJSXTags(t *testing.T) {
 }
 
 func TestHighlightLinesFallsBackToChroma(t *testing.T) {
-	got := highlightLines(fileColorer("build.bat", "dark"), []string{"REM build the app"})
+	got := highlightLines(fileColorer("build.bat", "dark", uiHighlighters), []string{"REM build the app"})
 	if spanColor(got, "REM build the app") == "" {
 		t.Error("a language without a tree-sitter grammar has no colors")
 	}
@@ -140,5 +140,54 @@ func TestReleaseBuildsEmbedEveryTreeSitterLanguage(t *testing.T) {
 				t.Errorf("%s does not embed the %s grammar", file, language)
 			}
 		}
+	}
+}
+
+// fakeFiles serves fixed file texts as a source.FileReader.
+type fakeFiles struct {
+	oldTexts, newTexts map[string]string
+}
+
+func (f fakeFiles) ReadFiles(_, _ []string) (map[string]string, map[string]string) {
+	return f.oldTexts, f.newTexts
+}
+
+func TestWholeFileColorsFixAHunkThatStartsAtAClosingJSXTag(t *testing.T) {
+	file := "const Page = () => (\n  <Button.Wrapper>\n    ok\n  </Button.Wrapper>\n);\n\nconst renderNotice = () => {\n  return null;\n};\n"
+	parsed := diff.Parse("diff --git a/page.tsx b/page.tsx\n--- a/page.tsx\n+++ b/page.tsx\n" +
+		"@@ -4,3 +4,7 @@\n   </Button.Wrapper>\n );\n \n+const renderNotice = () => {\n+  return null;\n+};\n+\n")
+	keyword := darkPalette.keyword
+
+	alone, _ := highlightFiles(parsed, "dark", nil, nil)
+	if got := alone[0][0][3][0]; got.text == "const" && got.color == keyword {
+		t.Fatal("the hunk alone colors const already, so the test does not cover the parser's error")
+	}
+
+	msg := colorWholeFiles(1, fakeFiles{newTexts: map[string]string{"page.tsx": file}}, parsed, "dark")().(wholeFilesMsg)
+	whole, _ := highlightFiles(parsed, "dark", nil, msg.colors)
+	if got := whole[0][0][3][0]; got.text != "const" || got.color != keyword {
+		t.Errorf("const has span %+v, want the keyword color %s", got, keyword)
+	}
+}
+
+func TestWholeFileColorsSkipLinesThatChangedInTheFile(t *testing.T) {
+	hunk := diff.Hunk{Lines: []diff.Line{{Kind: diff.Added, Text: "x := 1", NewLine: 1}}}
+	hunkLines := [][]span{{{text: "x := 1", color: "#hunk"}}}
+	colors := wholeFileColors{newVersion: versionColors{
+		lines: []string{"y := 2"},
+		spans: [][]span{{{text: "y := 2", color: "#file"}}},
+	}}
+
+	if got := colors.apply(hunk, hunkLines); !reflect.DeepEqual(got, hunkLines) {
+		t.Errorf("got %+v, want the hunk colors %+v", got, hunkLines)
+	}
+}
+
+func TestAnOlderWholeFileJobSkipsItsWork(t *testing.T) {
+	older := colorWholeFiles(1, fakeFiles{}, nil, "dark")
+	colorWholeFiles(2, fakeFiles{}, nil, "dark")
+
+	if msg := older(); msg != nil {
+		t.Errorf("the older job returned %+v, want no message", msg)
 	}
 }

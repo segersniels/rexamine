@@ -151,6 +151,11 @@ type Model struct {
 	// highlightCache holds the colors of the shown hunks, so a reload highlights only the hunks that changed.
 	highlightCache hunkColors
 
+	// wholeFiles holds the colors of the full files, by path, which replace the hunk colors when they arrive.
+	// wholeFilesGen counts the background jobs that color them, so the result of an older job is dropped.
+	wholeFiles    map[string]wholeFileColors
+	wholeFilesGen int
+
 	loading  bool
 	loadGen  int
 	watchGen int
@@ -323,6 +328,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case loadedMsg:
 		return m.handleLoaded(msg)
+
+	case wholeFilesMsg:
+		if msg.gen != m.wholeFilesGen {
+			return m, nil
+		}
+		m.wholeFiles = msg.colors
+		m.showFiles()
+		return m, nil
 
 	case tea.FocusMsg:
 		// Local reviews already check for changes on a timer. A pull request reloads only on request or focus.
@@ -506,7 +519,12 @@ func (m Model) handleLoaded(msg loadedMsg) (tea.Model, tea.Cmd) {
 	m.review = &msg.review
 	m.parsed = diff.Parse(msg.review.Diff)
 	m.showFiles()
-	return m, watch
+
+	m.wholeFilesGen++
+	if msg.review.Files == nil {
+		return m, watch
+	}
+	return m, tea.Batch(watch, colorWholeFiles(m.wholeFilesGen, msg.review.Files, m.parsed, m.markdownStyle))
 }
 
 // showFiles lays out the parsed files. It leaves out the test files when the
@@ -516,7 +534,7 @@ func (m *Model) showFiles() {
 	if m.settings.HideTests {
 		files = slices.DeleteFunc(slices.Clone(files), diff.File.IsTest)
 	}
-	m.highlights, m.highlightCache = highlightFiles(files, m.markdownStyle, m.highlightCache)
+	m.highlights, m.highlightCache = highlightFiles(files, m.markdownStyle, m.highlightCache, m.wholeFiles)
 	m.layout(files)
 }
 

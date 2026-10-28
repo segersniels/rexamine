@@ -144,6 +144,7 @@ func (l Local) Load() (Review, error) {
 		Head:    headName,
 		Diff:    tracked + untracked,
 		Root:    root,
+		Files:   gitFiles{root: root, oldRev: base},
 	}, nil
 }
 
@@ -190,6 +191,7 @@ func (l Local) loadLastTurn(root, branch string) (Review, error) {
 	if err != nil {
 		return Review{}, err
 	}
+	review.Files = gitFiles{root: root, oldRev: base, newRev: now}
 	return review, nil
 }
 

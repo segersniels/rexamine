@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -145,6 +146,85 @@ func PostReviewComment(pr PullRequest, comment ReviewComment) error {
 
 	_, err = run("", args...)
 	return err
+}
+
+// maxParallelFetches limits how many gh processes fetch files at the same time.
+const maxParallelFetches = 8
+
+var (
+	fileCacheMu sync.Mutex
+
+	// fileCache keeps file texts by host, repository, commit, and path. A file
+	// at a commit never changes, so a reload of the same pull request fetches
+	// no file again.
+	fileCache = map[string]string{}
+)
+
+// ReadFiles reads oldPaths at the commit where the pull request split from its
+// base branch, and newPaths at its head commit, by path. gh pr diff compares
+// the same two commits. It leaves out a file that it cannot fetch.
+func ReadFiles(pr PullRequest, oldPaths, newPaths []string) (oldTexts, newTexts map[string]string) {
+	parsed, err := url.Parse(pr.URL)
+	if err != nil {
+		return map[string]string{}, map[string]string{}
+	}
+	host, repo := parsed.Host, Repository(pr.URL)
+	newTexts = readFilesAt(host, repo, pr.HeadRefOid, newPaths)
+	if len(oldPaths) == 0 {
+		return map[string]string{}, newTexts
+	}
+
+	mergeBase, err := run("", "api", fmt.Sprintf("repos/%s/compare/%s...%s?per_page=1", repo, pr.BaseRefName, pr.HeadRefOid),
+		"--hostname", host, "--jq", ".merge_base_commit.sha")
+	if err != nil {
+		return map[string]string{}, newTexts
+	}
+	return readFilesAt(host, repo, strings.TrimSpace(string(mergeBase)), oldPaths), newTexts
+}
+
+// readFilesAt fetches the files at paths in a commit, a few at a time.
+func readFilesAt(host, repo, commit string, paths []string) map[string]string {
+	texts := map[string]string{}
+	var textsMu sync.Mutex
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, maxParallelFetches)
+
+	for _, path := range paths {
+		key := host + "/" + repo + "@" + commit + ":" + path
+		fileCacheMu.Lock()
+		text, cached := fileCache[key]
+		fileCacheMu.Unlock()
+		if cached {
+			textsMu.Lock()
+			texts[path] = text
+			textsMu.Unlock()
+			continue
+		}
+
+		wg.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+
+			escaped := strings.Split(path, "/")
+			for i, segment := range escaped {
+				escaped[i] = url.PathEscape(segment)
+			}
+			out, err := run("", "api", fmt.Sprintf("repos/%s/contents/%s?ref=%s", repo, strings.Join(escaped, "/"), commit),
+				"--hostname", host, "-H", "Accept: application/vnd.github.raw")
+			if err != nil {
+				return
+			}
+
+			fileCacheMu.Lock()
+			fileCache[key] = string(out)
+			fileCacheMu.Unlock()
+			textsMu.Lock()
+			texts[path] = string(out)
+			textsMu.Unlock()
+		})
+	}
+	wg.Wait()
+	return texts
 }
 
 // Repository reads "owner/repo" from a pull request URL, such as

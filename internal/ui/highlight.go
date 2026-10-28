@@ -29,12 +29,13 @@ type hunkColors map[string][][]span
 // name implies. markdownStyle picks light or dark colors. It reuses the colors
 // in previous for the hunks that did not change, because a parse is slow and
 // a reload while the agent works changes few hunks. It also returns the
-// colors of only these files' hunks, for the next call.
-func highlightFiles(files []diff.File, markdownStyle string, previous hunkColors) ([]highlightedFile, hunkColors) {
+// colors of only these files' hunks, for the next call. A line takes its
+// colors from wholeFiles when the full file is colored already.
+func highlightFiles(files []diff.File, markdownStyle string, previous hunkColors, wholeFiles map[string]wholeFileColors) ([]highlightedFile, hunkColors) {
 	result := make([]highlightedFile, len(files))
 	current := hunkColors{}
 	for i, file := range files {
-		colorSource := fileColorer(file.Path, markdownStyle)
+		colorSource := fileColorer(file.Path, markdownStyle, uiHighlighters)
 		for _, hunk := range file.Hunks {
 			key := hunkKey(file.Path, hunk)
 			lines, ok := previous[key]
@@ -42,7 +43,7 @@ func highlightFiles(files []diff.File, markdownStyle string, previous hunkColors
 				lines = highlightHunk(colorSource, hunk)
 			}
 			current[key] = lines
-			result[i] = append(result[i], lines)
+			result[i] = append(result[i], wholeFiles[file.Path].apply(hunk, lines))
 		}
 	}
 	return result, current
@@ -68,9 +69,10 @@ type sourceColorer func(source string) [][]span
 // fileColorer picks how to color a file. A tree-sitter grammar parses the
 // code, so it can tell function names, types, and properties apart. Chroma
 // covers the languages that rexamine has no grammar for. The result is nil
-// when neither knows the language.
-func fileColorer(path, markdownStyle string) sourceColorer {
-	if highlighter := treeSitterHighlighter(path); highlighter != nil {
+// when neither knows the language. highlighters must belong to the goroutine
+// that calls the result.
+func fileColorer(path, markdownStyle string, highlighters treeSitterHighlighters) sourceColorer {
+	if highlighter := highlighters.forPath(path); highlighter != nil {
 		palette := syntaxPaletteFor(markdownStyle)
 		return func(source string) [][]span {
 			return treeSitterSpans(highlighter, palette, source)

@@ -24,18 +24,21 @@ var treeSitterLanguages = map[string]bool{
 
 // treeSitterHighlighters keeps one highlighter per language, because a new
 // highlighter loads the grammar and compiles its query. A nil value marks a
-// language whose query does not compile. Only the UI goroutine highlights, so
-// the map needs no lock.
-var treeSitterHighlighters = map[string]*gotreesitter.Highlighter{}
+// language whose query does not compile. A highlighter reuses its buffers, so
+// each goroutine that highlights owns its own set.
+type treeSitterHighlighters map[string]*gotreesitter.Highlighter
 
-// treeSitterHighlighter returns the highlighter for the language of path, or
-// nil when the language is not in treeSitterLanguages.
-func treeSitterHighlighter(path string) *gotreesitter.Highlighter {
+// uiHighlighters color the hunks on the UI goroutine.
+var uiHighlighters = treeSitterHighlighters{}
+
+// forPath returns the highlighter for the language of path, or nil when the
+// language is not in treeSitterLanguages.
+func (h treeSitterHighlighters) forPath(path string) *gotreesitter.Highlighter {
 	entry := grammars.DetectLanguage(path)
 	if entry == nil || !treeSitterLanguages[entry.Name] {
 		return nil
 	}
-	if highlighter, ok := treeSitterHighlighters[entry.Name]; ok {
+	if highlighter, ok := h[entry.Name]; ok {
 		return highlighter
 	}
 
@@ -46,7 +49,7 @@ func treeSitterHighlighter(path string) *gotreesitter.Highlighter {
 
 	// A query that does not compile gives no highlighter, which leaves the language to Chroma.
 	highlighter, _ := gotreesitter.NewHighlighter(entry.Language(), query)
-	treeSitterHighlighters[entry.Name] = highlighter
+	h[entry.Name] = highlighter
 	return highlighter
 }
 
