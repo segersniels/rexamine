@@ -1548,7 +1548,7 @@ func (m Model) composerBox() []string {
 		BorderTop(false).
 		BorderForeground(color).
 		Padding(0, 1).
-		Width(width - 2)
+		Width(width)
 
 	borderStyle := lipgloss.NewStyle().Foreground(color)
 	lines := append([]string{borderStyle.Render(top)}, strings.Split(box.Render(m.composer.View()), "\n")...)

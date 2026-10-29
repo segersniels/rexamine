@@ -111,6 +111,14 @@ func TestViewFitsNarrowScreens(t *testing.T) {
 			t.Fatalf("width %d: comment box did not open", width)
 		}
 
+		// The top and bottom borders are drawn by hand, so the sides must line up with them.
+		box := m.composerBox()
+		for i, line := range box {
+			if got, want := ansi.StringWidth(line), ansi.StringWidth(box[0]); got != want {
+				t.Errorf("width %d: comment box line %d is %d columns wide, want %d", width, i+1, got, want)
+			}
+		}
+
 		for _, view := range []string{browsing, m.View().Content} {
 			for i, line := range strings.Split(view, "\n") {
 				if got := ansi.StringWidth(line); got > width {
