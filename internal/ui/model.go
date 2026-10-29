@@ -1363,7 +1363,14 @@ func (m Model) screen() string {
 	case m.mode == finding || m.mode == choosingBase:
 		return m.finderView()
 	case m.review == nil && m.loadErr != nil:
-		return ansi.Wrap(errorStyle.Render(m.loadErr.Error()), m.width, "") + "\n\n" + dimStyle.Render("r retry · q quit")
+		hint := "r retry · q quit"
+
+		// A branch without a pull request fails to load, and the switch key leads back to the local changes.
+		if m.keys.Switch.Enabled() {
+			switchHelp := m.keys.Switch.Help()
+			hint = "r retry · " + switchHelp.Key + " " + switchHelp.Desc + " · q quit"
+		}
+		return ansi.Wrap(errorStyle.Render(m.loadErr.Error()), m.width, "") + "\n\n" + dimStyle.Render(hint)
 	case m.review == nil:
 		return m.spinner.View() + " " + dimStyle.Render("Loading…")
 	}

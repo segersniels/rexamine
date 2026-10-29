@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -902,5 +903,15 @@ func TestReloadBlocksTheOpenCommentWhenItsLinesChange(t *testing.T) {
 	m, _ = press(m, "esc", "c")
 	if m.linesChanged {
 		t.Error("a new comment shows changed lines")
+	}
+}
+
+func TestLoadErrorShowsTheKeyBackToTheLocalChanges(t *testing.T) {
+	m, _ := press(New(source.Local{}, &fakeSender{}, nil, "dark", config.Config{}), "p")
+	model, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	model, _ = model.Update(loadedMsg{gen: model.(Model).loadGen, err: errors.New(`no pull requests found for branch "master"`)})
+
+	if view := ansi.Strip(model.(Model).View().Content); !strings.Contains(view, "p local changes") {
+		t.Errorf("got %q, want a hint to switch back to the local changes", view)
 	}
 }
