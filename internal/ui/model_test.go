@@ -866,3 +866,41 @@ func TestEditorKeyNeedsTheBranchOfThePullRequest(t *testing.T) {
 		t.Errorf("got status %q, want a hint to check out the branch", m.status)
 	}
 }
+
+func TestReloadBlocksTheOpenCommentWhenItsLinesChange(t *testing.T) {
+	sender := &fakeSender{}
+	m := newLoadedModel(t, sender, 60, 60)
+	m, _ = press(m, "]", "j", "j", "j", "c", "h", "i")
+
+	// A reload that leaves the commented lines alone keeps the comment as it is.
+	review := testReview()
+	review.Title = "Tidy imports again"
+	model, _ := m.Update(loadedMsg{gen: m.loadGen, review: review})
+	m = model.(Model)
+	if m.linesChanged {
+		t.Fatal("a reload that kept the lines marked the lines of the comment changed")
+	}
+
+	// A line above the comment moves "type Language" from L2 to L3.
+	review.Diff = strings.Replace(testDiff, "@@ -1,4 +1,5 @@ import {\n", "@@ -1,4 +1,6 @@ import {\n+// a new first line\n", 1)
+	model, _ = m.Update(loadedMsg{gen: m.loadGen, review: review})
+	m = model.(Model)
+	if m.mode != composing || m.composer.Value() != "hi" {
+		t.Fatalf("mode %v, draft %q; want the comment box with the draft kept", m.mode, m.composer.Value())
+	}
+	if !m.linesChanged || !strings.Contains(ansi.Strip(m.View().Content), "L2 · lines changed") {
+		t.Error("the comment box does not show that its lines changed")
+	}
+
+	// The old lines would mislead the agent, so the comment does not go out.
+	m, _ = press(m, "enter", "ctrl+s")
+	if m.mode != composing || len(sender.sent)+len(sender.submitted) != 0 {
+		t.Errorf("mode %v, sent %q; want the comment kept and not sent", m.mode, sender.sent)
+	}
+
+	// A new comment starts from the current lines.
+	m, _ = press(m, "esc", "c")
+	if m.linesChanged {
+		t.Error("a new comment shows changed lines")
+	}
+}

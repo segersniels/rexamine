@@ -187,6 +187,9 @@ type Model struct {
 	mode          mode
 	snippet       agent.Snippet
 
+	// linesChanged is set when a reload changed the lines of the open comment, so the comment points at old code.
+	linesChanged bool
+
 	// destination stays the same between comments, so a review pass can post several comments in a row.
 	destination destination
 
@@ -520,6 +523,11 @@ func (m Model) handleLoaded(msg loadedMsg) (tea.Model, tea.Cmd) {
 	m.parsed = diff.Parse(msg.review.Diff)
 	m.showFiles()
 
+	// An edit can move or change the commented code while the user writes, and the draft keeps the old lines.
+	if m.mode == composing {
+		m.linesChanged = m.anchor < 0 || !slices.Equal(m.selectedSnippet().Lines, m.snippet.Lines)
+	}
+
 	m.wholeFilesGen++
 	if msg.review.Files == nil {
 		return m, watch
@@ -828,6 +836,10 @@ func (m Model) updateComposer(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.setDestination(toAgent)
 		}
 		return m, nil
+
+	// The comment points at code that changed, so the user selects the lines again.
+	case m.linesChanged && (key.Matches(msg, m.composeKeys.Send) || key.Matches(msg, m.composeKeys.SendNow)):
+		return m, m.setStatus(errorStyle.Render("The code changed. Select the lines again to comment."))
 
 	case key.Matches(msg, m.composeKeys.SendNow):
 		text := agent.Format(m.snippet, m.composer.Value())
@@ -1181,6 +1193,7 @@ func (m *Model) startComment() tea.Cmd {
 	}
 
 	m.snippet = m.selectedSnippet()
+	m.linesChanged = false
 	m.mode = composing
 	m.composer.Reset()
 	m.composer.SetWidth(m.composerTextWidth())
@@ -1536,12 +1549,20 @@ func (m Model) composerBox() []string {
 		color = mergedColor
 	}
 
+	marker := ""
+	if m.linesChanged {
+		marker = " · lines changed"
+	}
+
 	// On a narrow screen, keep the end of the path, which names the file.
 	label := fmt.Sprintf("%s %s", m.snippet.Path, m.snippet.Location())
-	if room := width - 6; ansi.StringWidth(label) > room {
+	if room := width - 6 - ansi.StringWidth(marker); ansi.StringWidth(label) > room {
 		label = ansi.TruncateLeft(label, ansi.StringWidth(label)-room+1, "…")
 	}
-	top := "╭─ " + label + " " + strings.Repeat("─", max(0, width-ansi.StringWidth(label)-5)) + "╮"
+
+	borderStyle := lipgloss.NewStyle().Foreground(color)
+	dashes := strings.Repeat("─", max(0, width-ansi.StringWidth(label)-ansi.StringWidth(marker)-5))
+	top := borderStyle.Render("╭─ "+label) + errorStyle.Render(marker) + borderStyle.Render(" "+dashes+"╮")
 
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -1550,8 +1571,7 @@ func (m Model) composerBox() []string {
 		Padding(0, 1).
 		Width(width)
 
-	borderStyle := lipgloss.NewStyle().Foreground(color)
-	lines := append([]string{borderStyle.Render(top)}, strings.Split(box.Render(m.composer.View()), "\n")...)
+	lines := append([]string{top}, strings.Split(box.Render(m.composer.View()), "\n")...)
 
 	// The hint sits in the bottom border, next to the text, where the user looks while writing.
 	if m.composeKeys.Cycle.Enabled() || m.destination == toPullRequest {
