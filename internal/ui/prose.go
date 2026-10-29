@@ -115,8 +115,14 @@ func reviewBadge(decision string) string {
 
 // reviewerChips renders each reviewer with the state of their review,
 // followed by the requested reviewers who have not reviewed yet. As on GitHub,
-// a later comment does not replace an approval or a change request.
+// a later comment does not replace an approval or a change request, and a new
+// review request replaces the earlier review.
 func reviewerChips(pr github.PullRequest) []string {
+	requested := map[string]bool{}
+	for _, request := range pr.ReviewRequests {
+		requested[request.Login] = true
+	}
+
 	var logins []string
 	states := map[string]string{}
 	for _, review := range pr.Reviews {
@@ -139,8 +145,12 @@ func reviewerChips(pr github.PullRequest) []string {
 	}
 
 	var chips []string
-	reviewed := map[string]bool{}
 	for _, login := range logins {
+		// A re-requested reviewer shows as pending, because the earlier review no longer counts.
+		if requested[login] {
+			continue
+		}
+
 		switch states[login] {
 		case "APPROVED":
 			chips = append(chips, addedStyle.Render("✓ "+login))
@@ -148,19 +158,13 @@ func reviewerChips(pr github.PullRequest) []string {
 			chips = append(chips, removedStyle.Render("✗ "+login))
 		case "COMMENTED":
 			chips = append(chips, dimStyle.Render("○ "+login))
-		default:
-			continue
 		}
-		reviewed[login] = true
 	}
 
 	for _, request := range pr.ReviewRequests {
 		name := request.Login
 		if name == "" {
 			name = request.Name
-		}
-		if reviewed[name] {
-			continue
 		}
 		chips = append(chips, warningStyle.Render("● ")+name)
 	}

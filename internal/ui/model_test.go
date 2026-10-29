@@ -640,12 +640,13 @@ func TestReviewerChipsShowEachReviewerOnce(t *testing.T) {
 	pr := github.PullRequest{
 		Author: github.Author{Login: "author"},
 		ReviewRequests: []github.ReviewRequest{
-			{Login: "approver"},
+			{Login: "rerequested"},
 			{Login: "waiting"},
 			{Name: "core-team"},
 		},
 		Reviews: []github.Review{
 			{Author: github.Author{Login: "approver"}, State: "APPROVED"},
+			{Author: github.Author{Login: "rerequested"}, State: "APPROVED"},
 			{Author: github.Author{Login: "blocker"}, State: "COMMENTED"},
 			{Author: github.Author{Login: "blocker"}, State: "CHANGES_REQUESTED"},
 			{Author: github.Author{Login: "approver"}, State: "COMMENTED"},
@@ -660,7 +661,7 @@ func TestReviewerChipsShowEachReviewerOnce(t *testing.T) {
 		got = append(got, ansi.Strip(chip))
 	}
 
-	want := []string{"✓ approver", "✗ blocker", "○ bot", "● waiting", "● core-team"}
+	want := []string{"✓ approver", "✗ blocker", "○ bot", "● rerequested", "● waiting", "● core-team"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("reviewerChips() = %q, want %q", got, want)
 	}
