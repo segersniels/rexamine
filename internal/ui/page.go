@@ -168,14 +168,12 @@ func layoutFile(index int, file diff.File, highlighted highlightedFile, width in
 			text := displayText(line.Text)
 
 			// Most lines fit, and a string is never wider than its length in bytes.
-			chunks := []string{text}
+			chunks := [][2]int{{0, len(text)}}
 			if len(text) > textWidth {
-				chunks = strings.Split(ansi.Hardwrap(text, textWidth, true), "\n")
+				chunks = wrapWords(text, textWidth)
 			}
-			offset := 0
 			for part, chunk := range chunks {
-				colored := colorize(spansIn(highlighted[h][l], offset, offset+len(chunk)))
-				offset += len(chunk)
+				colored := colorize(spansIn(highlighted[h][l], chunk[0], chunk[1]))
 
 				gutter := strings.Repeat(" ", gutterWidth)
 				if part == 0 {
@@ -189,6 +187,53 @@ func layoutFile(index int, file diff.File, highlighted highlightedFile, width in
 		}
 	}
 	return rows
+}
+
+// wrapWords splits text into lines that are at most width wide, and returns
+// the start and end byte of each line. It breaks at a space, and splits a word
+// only when the word does not fit on a line. The space at a break is dropped,
+// so a wrapped line does not start with it.
+func wrapWords(text string, width int) [][2]int {
+	var lines [][2]int
+	start, lineWidth := 0, 0
+
+	// breakAt is the last space after a word on the current line, or -1.
+	breakAt := -1
+	for i, r := range text {
+		w := ansi.StringWidth(string(r))
+
+		if r == ' ' {
+			// A space that does not fit ends the line, and is dropped.
+			if lineWidth+w > width {
+				lines = append(lines, [2]int{start, i})
+				start, lineWidth, breakAt = i+1, 0, -1
+				continue
+			}
+
+			// Spaces of the indentation are not a place to break.
+			if strings.TrimLeft(text[start:i], " ") != "" {
+				breakAt = i
+			}
+			lineWidth += w
+			continue
+		}
+
+		if lineWidth+w > width && i > start {
+			end, next := i, i
+			if breakAt >= 0 {
+				end, next = breakAt, breakAt+1
+			}
+			lines = append(lines, [2]int{start, end})
+			start, breakAt = next, -1
+			lineWidth = ansi.StringWidth(text[start:i])
+		}
+		lineWidth += w
+	}
+
+	if start < len(text) || len(lines) == 0 {
+		lines = append(lines, [2]int{start, len(text)})
+	}
+	return lines
 }
 
 // fileTitle renders a chevron that shows whether the file is collapsed, the

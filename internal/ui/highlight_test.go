@@ -4,6 +4,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"slices"
 	"testing"
 
 	"github.com/segersniels/rexamine/internal/diff"
@@ -189,5 +190,26 @@ func TestAnOlderWholeFileJobSkipsItsWork(t *testing.T) {
 
 	if msg := older(); msg != nil {
 		t.Errorf("the older job returned %+v, want no message", msg)
+	}
+}
+
+func TestWrapWordsBreaksAtSpaces(t *testing.T) {
+	tests := []struct {
+		text  string
+		width int
+		want  []string
+	}{
+		{"one two three", 8, []string{"one two", "three"}},
+		{"  const value = 1", 12, []string{"  const", "value = 1"}},
+		{"createGmailClient(id)", 8, []string{"createGm", "ailClien", "t(id)"}},
+	}
+	for _, tt := range tests {
+		var got []string
+		for _, line := range wrapWords(tt.text, tt.width) {
+			got = append(got, tt.text[line[0]:line[1]])
+		}
+		if !slices.Equal(got, tt.want) {
+			t.Errorf("wrapWords(%q, %d) = %q, want %q", tt.text, tt.width, got, tt.want)
+		}
 	}
 }
